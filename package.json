@@ -1,0 +1,20 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "description": "API para varios servicios en la nuke K8S",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Santiago Diaz",
+  "license": "ISC",
+  "dependencies": {
+     "express":"*",
+     "mysql":"*",
+     "nodemailer":"*",
+     "https":"*",
+     "request": "*",
+     "body-parser":"*",
+     "cors":"*"
+  }
+}

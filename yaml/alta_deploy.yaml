@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+   name: _deploy_name_
+   labels:
+      app: redis
+spec:
+   selector:
+      matchLabels:
+         app: redis
+         role: master
+         tier: backend
+   replicas: _replicas_
+   template:
+      metadata:
+         labels:
+            app: redis
+            role: master
+            tier: backend
+      spec:
+         containers:
+         - name: _container_name_
+           image: _image_name_
+           resources:
+              requests:
+                 cpu: _cpu_request_
+                 memory: _mem_request_
+           _envs_
+           _args_
+           _ports_
+           _volume_mounts_
+         _volume_def_
