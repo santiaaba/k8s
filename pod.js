@@ -13,7 +13,7 @@ list: function(req,res){
 
 	var k8s_api = new K8sApi('10.120.78.86','6443')
 
-	NamespaceApi.checkUserNamespace(req.params.userid,req.params.namespaceid)
+	NamespaceApi.checkUserNamespace(req)
 	.then(ok =>{
 		console.log("Buscando nombre")
 		return NamespaceApi.namespaceNameById(req.params.namespaceid)
@@ -45,7 +45,7 @@ show: function(req,res){
 
 	var k8s_api = new K8sApi('10.120.78.86','6443')
 
-	NamespaceApi.checkUserNamespace(req.params.userid,req.params.namespaceid)
+	NamespaceApi.checkUserNamespace(req)
 	.then(ok =>{
 		console.log("Buscando nombre")
 		return NamespaceApi.namespaceNameById(req.params.namespaceid)

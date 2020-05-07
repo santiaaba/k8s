@@ -16,10 +16,11 @@ nuevo: function(req,res){
 		return
 	}
 	/* Existencia usuario */
-	userInfo(req.params.userid,db)
+	//userInfo(req.params.userid,db)
+	userInfo(userid,db)
 	.then(rows => {
 		sql = 'insert into namespace(user_id,name) values (' +
-			  req.params.userid + ',"' + req.body.name + '")'
+			  userid + ',"' + req.body.name + '")'
 		console.log(sql)
 		return db.query(sql)
 	},err=>{
@@ -28,7 +29,7 @@ nuevo: function(req,res){
 		})
 	})
 
-	sql = 'select id from user where id =' + req.params.userid
+	sql = 'select id from user where id =' + userid
 	console.log(sql)
 	db.query(sql)
 	.then( rows => {
@@ -96,13 +97,37 @@ nuevo: function(req,res){
 
 list: function(req,res){
 	/* Listado de namespaces del usuario */
-	sql = 'select id,name from namespace where user_id =' + req.params.userid
-	console.log(sql)
-	db.query(sql)
+	return new Promise((resolv,reject) => {
+		var idUser = 0
+		var i = 0
+		console.log("-------usuarios-------")
+		console.log(users)
+		console.log("----------------------")
+		while(idUser == 0 && i < users.length){
+			if(req.headers['token'] == users[i].token){
+				idUser = users[i].id
+			}
+			i++
+		}
+		if (!idUser)
+			reject({code:300,message:"Token Incorrecto"})
+		resolv(idUser)
+
+	})
+	.then(idUser=>{
+		console.log("El userid = " + idUser)
+		sql = 'select id,name from namespace where user_id =' + idUser
+		console.log(sql)
+		return db.query(sql)
+	},err=>{
+		console.log(err)
+		res.status(300).send("Usuario incorrecto")
+	})
 	.then( rows => {
 		res.send(JSON.stringify(rows))
 	})
 	.catch( err => {
+		console.log(err)
 		errorDB(err)
 	})
 },
@@ -112,7 +137,7 @@ show: function(req,res){
 
 	var k8s_api = new K8sApi('10.120.78.86','6443')
 
-	module.exports.checkUserNamespace(req.params.userid,req.params.namespaceid)
+	module.exports.checkUserNamespace(req)
 	.then(ok =>{
 		return module.exports.namespaceNameById(req.params.namespaceid)
 	}, err => {
@@ -147,7 +172,7 @@ drop: function(req,res){
 	/* Elimina un namespace */
 	var k8s_api = new K8sApi('10.120.78.86','6443')
 
-	module.exports.checkUserNamespace(req.params.userid,req.params.namespaceid)
+	module.exports.checkUserNamespace(req)
 	.then(ok =>{
 		console.log("Buscando nombre")
 		return module.exports.namespaceNameById(req.params.namespaceid)
@@ -183,38 +208,33 @@ drop: function(req,res){
 	})
 },
 
-checkUserNamespace: function(idUser,idNamespace){
+//checkUserNamespace: function(idUser,idNamespace){
+checkUserNamespace: function(req){
 	/* Verifica que usuario y namespace existan */
 	return new Promise((resolv,reject) => {
-		sql = 'select id from user where id = ' + idUser
-		console.log(sql)
-		db.query(sql)
-		.then(rows=>{
-			console.log("----rows----")
-			console.log(rows)
-			console.log("-------------")
-			if(rows.length == 1){
-				sql = 'select name from namespace where id =' + idNamespace
-					  ' and user_id = ' + idUser
-				db.query(sql)
-				.then(rows => {
-					if(rows.length == 1){
-						resolv()
-					} else {
-						reject({code:402,message:"Namespace no existe"})
-					}
-				}, err => {
-					console.log(err)
-					reject({code:500,message:"Error en base de datos"})
-				})
-			} else {
-				reject({code:401,message:"usuario no existe"})
+		var idUser = 0
+		var i = 0
+		while(idUser == 0 && i < users.length){
+			if(req.headers['token'] == users[i].token){
+				idUser = users[i].id
 			}
-		}, err =>{
-			return new Promise((resolv,reject)=>{
-				console.log(err)
-				reject({code:500,message:"Error en base de datos"})
-			})
+			i++
+		}
+		if (!idUser){
+			reject({code:300,message:"Token Incorrecto"})
+		}
+		sql = 'select name from namespace where id =' + req.params.namespaceid
+			  ' and user_id = ' + idUser
+		db.query(sql)
+		.then(rows => {
+			if(rows.length == 1){
+				resolv()
+			} else {
+				reject({code:402,message:"Namespace no existe o no pertenece al usuario"})
+			}
+		}, err => {
+			console.log(err)
+			reject({code:500,message:"Error en base de datos"})
 		})
 	})
 },

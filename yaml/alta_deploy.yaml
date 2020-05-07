@@ -3,20 +3,16 @@ kind: Deployment
 metadata:
    name: _deploy_name_
    labels:
-      app: redis
+      fibercorpDeploy: _fibercorpID_
 spec:
    selector:
       matchLabels:
-         app: redis
-         role: master
-         tier: backend
+         fibercorpPod: _fibercorpID_
    replicas: _replicas_
    template:
       metadata:
          labels:
-            app: redis
-            role: master
-            tier: backend
+            fibercorpPod: _fibercorpID_
       spec:
          containers:
          - name: _container_name_
@@ -29,4 +25,4 @@ spec:
            _args_
            _ports_
            _volume_mounts_
-         _volume_def_
+         _volume_defs_

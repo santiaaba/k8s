@@ -40,30 +40,23 @@ class K8sApi {
 				//console.log(options)
 				const https = require("https")
 				console.log("Enviamos la consulta a K8s")
+				console.log(method + ':' + path)
 				const req = https.request(options)
 				req.on('response',function(res){
 					console.log("statusCode: " + res.statusCode)
 					res.on('data', d => {
-						console.log("OBTENIENDO DATOS:" + d)
+						//console.log("OBTENIENDO DATOS:" + d)
 						datos = datos + d
 					})
 					res.on('end',function(){
-						console.log("Datos recibidos: " + datos)
+						//console.log("Datos recibidos: " + datos)
 						if(res.statusCode >= 200 && res.statusCode <= 299){
 							console.log("Es un OK")
-							resolve({status:res.statusCode,message:datos})
+							resolve({status:res.statusCode,message:JSON.parse(datos)})
 						} else {
 							console.log("Es un ROLLBACK")
-							reject({status:res.statusCode,message:datos})
+							reject({status:res.statusCode,message:JSON.parse(datos)})
 						}
-					/*
-						console.log('K8s request completed successfully');
-						if(res.statusCode >= 200 && res.statusCode <= 299){
-							console.log("Es un OK")
-						} else {
-							console.log("FALLO")
-						}
-					*/
 					})
 				})
 				req.on('error', error => {
@@ -71,7 +64,7 @@ class K8sApi {
 					console.log(error)
 					reject({status:500,message:'{"error":"Error interno"}'})
 				})
-				if(method == 'POST'){
+				if(method == 'POST' || method == 'PUT'){
 					//console.log("Enviando: \n" + data)
 					req.write(data)
 				}
@@ -88,7 +81,7 @@ module.exports = K8sApi
 
 function reemplazo(string,d){
 	for(i=0;i<d.length;i++){
-		//console.log("Reemplazando: " + d[i].regex + ' por ' + d[i].value)
+		//console.log("Reemplazando: --" + d[i].regex + '-- por --' + d[i].value + '--')
 		regex = new RegExp(d[i].regex,'g')
 		string = string.replace(regex,d[i].value)
 	}
