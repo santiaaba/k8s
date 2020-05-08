@@ -87,31 +87,56 @@ apply: function(req,res){
 		
 			/* Servicios */
 			if(typeof(req.body.services) != 'undefined'){
-				data = 'ports:\n'
 				for(i=0;i<req.body.services.length;i++){
-				    if(typeof req.body.services[i].ports == 'undefined'||
-				       typeof req.body.services[i].name == 'undefined'||
+				    if(typeof req.body.services[i].name == 'undefined'||
 				       typeof req.body.services[i].type == 'undefined'){
 							reject("ACA3")
+					}
+				    if((req.body.services[i].type == 'out' ||
+				       req.body.services[i].type == 'in') &&
+					   typeof(req.body.services[i].ports) == 'undefined'){
+							reject("Falta definir puertos")
 					}
 					if(req.body.services[i].type == 'out' &&
 					   typeof(req.body.services[i].ip) == 'undefined'){
 							reject("Falta IP")
 					}
 					if(req.body.services[i].type == 'url' &&
-					   typeof(req.body.services[i].url) == 'undefined'){
+					   typeof(req.body.services[i].urls) == 'undefined'){
 							reject("Falta la URL")
 					}
-					/* Revisamos los puertos definidos dentro del servicio */
-					//console.log("PORTS DATOS " + JSON.stringify(req.body.services[i].ports))
-					for(j=0;j<req.body.services[i].ports.length;j++){
-						var port = req.body.services[i].ports[j]
-						if(typeof port.protocol == 'undefined'||
-	                       typeof port.port == 'undefined')
-								reject("Puerto mal cargado")
-						data += '           - containerPort: ' + port.port + '\n'
-						data += '             name: ' + port.name + '\n'
-						data += '             protocol: ' + port.protocol + '\n'
+					if(req.body.services[i].type != 'url' &&
+					   typeof(req.body.services[i].ports) == 'undefined'){
+							reject("Falta definir puertos")
+					}
+					data = 'ports:\n'
+					if(req.body.services[i].type != 'url'){
+						/* Revisamos los puertos */
+						for(j=0;j<req.body.services[i].ports.length;j++){
+							var port = req.body.services[i].ports[j]
+							if(typeof port.protocol == 'undefined'||
+		                       typeof port.port == 'undefined')
+									reject("Puerto mal cargado")
+							data += '           - containerPort: ' + port.port + '\n'
+							data += '             name: ' + port.name + '\n'
+							data += '             protocol: ' + port.protocol + '\n'
+						}
+					} else {
+						/* Revisamos los URL */
+						ports = new Set
+						for(j=0;j<req.body.services[i].urls.length;j++){
+							var url = req.body.services[i].urls[j]
+							if(typeof url.path == 'undefined'||
+		                       typeof url.port == 'undefined' ||
+		                       typeof url.path == 'undefined')
+									reject("URL mal declarada.")
+							ports.add(url.port)
+						}
+						ports.forEach(function(v,i){
+							data += '           - containerPort: ' + v + '\n'
+							data += '             name: ingress' + v + '\n'
+							data += '             protocol: TCP\n'
+						})
 					}
 				}
 				data = data.slice(0, -1)
@@ -194,19 +219,11 @@ apply: function(req,res){
 		})
 	})
 	.then(ok=>{
-		/* Damos de alta o actualizamos los servicios */
-
-		/* Para la actualizacion, necesitamos obtener de K8S dos valores
-	 	 * y agregarlos al yaml a ser enviado. Estos valores son:
- 		 * metadata.resourceVersion y spec.clusterIP (aun cuando es type NodePort)
- 		 * obtener los valores es mas costoso. Hay que llamar a la api de K8s para
- 		 * averiguar estos valores. Es mejor simplemente eliminar y crear
- 		 * nuevamente los servicios
- 		 */
-		services = new Array
-		console.log("BORRAMOS O NO BORRAMOS:" + alta)
+		/* Necesitamos obtener los servicios del deployment.
+		 * Esto solo si es una modificacion ya que deberemos
+		 * eliminar los servicios y generarlos nuevamente con
+		 * los cambios.*/
 		if(!alta){
-			/* Borramos los servicios del deployment */
 			return k8s_api.call('/api/v1/namespaces/' + namespaceName +
 					  		    '/services?labelSelector=fibercorpService%3D' + fibercorpID
 								,'GET','none.yaml',{})
@@ -222,11 +239,16 @@ apply: function(req,res){
 		})
 	})
 	.then(ok =>{
+		/* Para la actualizacion, necesitamos obtener de K8S dos valores
+	 	 * y agregarlos al yaml a ser enviado. Estos valores son:
+ 		 * metadata.resourceVersion y spec.clusterIP (aun cuando es type NodePort)
+ 		 * obtener los valores es mas costoso. Hay que llamar a la api de K8s para
+ 		 * averiguar estos valores. Es mejor simplemente eliminar y crear
+ 		 * nuevamente los servicios
+ 		 */
 		if(!alta){
 			/* ok son los datos de la consulta que obtuvo los servicios */
-			console.log("-----------OK----------")
-			console.log(ok)
-			console.log("-----------FIN OK----------")
+			var services = new Array
 			ok.message.items.forEach(function(v,i){
 				console.log("Eliminamos " + JSON.stringify(v))
 				services.push(k8s_api.call('/api/v1/namespaces/' + namespaceName +
@@ -235,7 +257,7 @@ apply: function(req,res){
 			})
 			return Promise.all(services)
 		} else {
-			/* No hago nada */
+			/* No hago nada. Ya que al ser un alta no hay nada que borrar */
             return new Promise((resolv,reject) => { resolv()})
 		}
 	},err => {
@@ -245,9 +267,10 @@ apply: function(req,res){
 			})
 	})
 	.then(ok =>{
-		/* Sea un alta o modificacion, agregamos los servicios */
+		/* Sea un alta o modificacion, agregamos los servicios. */
 		req.body.services.forEach(function(v,i){
 			diccionario = []
+			services = new Array
 			diccionario.push({'regex':'_name_','value':v.name})
 			diccionario.push({'regex':'_fibercorpID_','value':fibercorpID})
 			var type
@@ -258,17 +281,31 @@ apply: function(req,res){
 				case "out":
 				case "url":
 					type = "NodePort"
-					console.log("Debemos dar de alta un ingress adicional")
 			}
 			diccionario.push({'regex':'_type_','value':type})
 			diccionario.push({'regex':'_labeltype_','value':v.type})
 			var ports= "ports:\n"
-			v.ports.forEach(function(v,i){
-				ports += '       - name: ' + v.name + '\n'
-				ports += '         port: ' + v.port + '\n'
-                ports += '         protocol: ' + v.protocol + '\n'
-                ports += '         targetPort: ' + v.port + '\n'
-			})
+			if(v.type == "in" || v.type == "out"){
+				v.ports.forEach(function(v,i){
+					ports += '       - name: ' + v.name + '\n'
+					ports += '         port: ' + v.port + '\n'
+					ports += '         protocol: ' + v.protocol + '\n'
+					ports += '         targetPort: ' + v.port + '\n'
+				})
+			} else {
+				/* Tenemos que generar los puertos de htt y https
+ 				   si el tipo es url (Ingress) */
+				portSet = new Set
+				v.urls.forEach(function(v,i){
+					portSet.add(v.port)
+				})
+				portSet.forEach(function(v,i){
+					ports += '       - name: ingress' + v + '\n'
+					ports += '         port: ' + v + '\n'
+					ports += '         protocol: TCP' +  '\n'
+					ports += '         targetPort: ' + v + '\n'
+				})
+			}
 			diccionario.push({'regex':'_ports_','value':ports})
 			const url = '/api/v1/namespaces/' + namespaceName + '/services'
 			services.push(k8s_api.call(url,'POST','alta_service.yaml',diccionario))
@@ -282,13 +319,48 @@ apply: function(req,res){
 		})
 	})
 	.then(ok=>{
-		console.log("Deploy dado de alta!!")
-		res.status(200).send("Deploy generado")
+		/* Necesitamos obtener los Ingress del deployment.
+		 * Esto solo si es una modificacion ya que deberemos
+		 * eliminar los Ingress y generarlos nuevamente con
+		 * los cambios si correspondiese.*/
+		if(!alta){
+			return k8s_api.call('/apis/networking.k8s.io/v1beta1/namespaces/' + namespaceName +
+					  		    '/ingresses?labelSelector=fibercorpIngress%3D' + fibercorpID
+								,'GET','none.yaml',{})
+		} else {
+			console.log("NO boramos NAAAADA")
+			/* no hago nada ya que es un alta */
+            return new Promise((resolv,reject) => { resolv()})
+		}
+	},err=>{
+		console.log(err)
+		return new Promise((resolv,reject)=>{
+			res.status(500).send("Json del Body incorrecto: " + err)
+		})
+	})
+	.then(ok=>{
+		/* Borramos los posibles Ingress existentes para este
+		 * deploy. Es el mismo procedimiento que para los services
+		 * Si corresponde, los crearemos nuevamente luego */
+		if(!alta){
+			/* ok son los datos de la consulta que obtuvo los servicios */
+			ok.message.items.forEach(function(v,i){
+				console.log("Eliminamos " + JSON.stringify(v))
+				services.push(k8s_api.call('/apis/networking.k8s.io/v1beta1/namespaces/' +
+					namespaceName + '/ingresses/' + v.metadata.name
+					,'DELETE','none.yaml',{}))
+			})
+			return Promise.all(services)
+		} else {
+			/* No hago nada. Ya que al ser un alta no hay nada que borrar */
+            return new Promise((resolv,reject) => { resolv()})
+		}
 	},err=>{
 		console.log("Fallo alta o update Servicio en K8s")
 		console.log(err)
 		errorPrevio = err
 		if(alta){
+			/* Boramos el deployment */
 			const url = '/apis/apps/v1/namespaces/' + namespaceName +
 						'/deployments/' + req.body.deployName
 			k8s_api.call(url,'DELETE','none.yaml',[])
@@ -302,6 +374,53 @@ apply: function(req,res){
 		} else {
 			res.status(500).send(errorPrevio.message)
 		}
+	})
+	.then(ok =>{
+		/* Sea un alta o modificacion, agregamos los Ingress. Solo
+		 * de aquellos servicios que sean del tipo url.  */
+		diccionario = []
+		diccionario.push({'regex':'_fibercorpID_','value':fibercorpID})
+		diccionario.push({'regex':'_name_','value':'ingress-' + req.body.deployName})
+		var ingress = ''
+		req.body.services.forEach(function(v,i){
+			if(v.type == 'url'){
+				var serviceName = v.name
+				v.urls.forEach(function(v,i){
+					ingress += '    - host: ' + v.url + '\n'
+					ingress += '      http:\n'
+					ingress += '        paths:\n'
+					ingress += '        - path: ' + v.path + '\n'
+					ingress += '          backend:\n'
+					ingress += '            serviceName: ' + serviceName + '\n'
+					ingress += '            servicePort: ' + v.port + '\n'
+				})
+			}
+		})
+		diccionario.push({'regex':'_hostRule_','value':ingress})
+		if(ingress != ''){
+			const url = '/apis/extensions/v1beta1/namespaces/' +
+						namespaceName + '/ingresses'
+			return k8s_api.call(url,'POST','alta_ingress.yaml',diccionario)
+		} else {
+			/* No cargo ningun ingress */
+			return new Promise((resolv,reject)=>{ resolv() })
+		}
+	},err=>{
+		console.log("Fallo alta Deploy en K8s")
+		console.log(err)
+		return new Promise((resolv,reject)=>{
+			res.status(err.status).send(err.message)
+		})
+	})
+	.then(ok=>{
+		console.log("Deploy dado de alta!!")
+		res.status(200).send("Deploy generado")
+	},err=>{
+		console.log("Fallo alta Deploy en K8s")
+		console.log(err)
+		return new Promise((resolv,reject)=>{
+			res.status(err.status).send(err.message)
+		})
 	})
 },
 
@@ -385,6 +504,18 @@ show: function(req,res){
 	.then(ok => {
 		//console.log(ok)
 		services = ok.message.items
+		/* Obtenemos los Ingress  del deployment buscando con el label 
+ 		 * fibercorpID. Con ello nos limitamos a los servicios del deployment */
+		console.log("Enviando consulta a api K8S")
+		return k8s_api.call('/apis/networking.k8s.io/v1beta1/namespaces/' + namespaceName +
+				  		    '/ingresses?labelSelector=fibercorpIngress%3D' + fibercorpID
+							,'GET','none.yaml',{})
+	},err => {
+		console.log(err)
+		res.status(err.status).send(err.message)
+	})
+	.then(ok => {
+		ingress = ok.message
 		/* Generamos el Json en base al deployment obtenido de K8S */
 		/* De momento es un solo tipo de container */
 		var container = deployment.spec.template.spec.containers[0]
@@ -415,16 +546,29 @@ show: function(req,res){
 		}
 		if(typeof(services) != 'undefined'){
 			services.forEach(function(v,i){
-				var service = {
-					name: v.metadata.name,
-					resourceVersion: v.metadata.resourceVersion,
-					clusterIP: v.spec.clusterIP,
-					type: v.metadata.labels.type,
-					ports: []
+				service = '{"name":"' + v.metadata.name + '",'
+				service += '"type":"' + v.metadata.labels.type + '",'
+				if(v.metadata.labels.type != 'url'){
+					service += '"ports":[]}'
+					service = JSON.parse(service)
+					v.spec.ports.forEach(function(w,j){
+						service.ports.push({name:w.name,protocol:w.protocol,port:w.targetPort})
+					})
+				} else {
+					service += '"urls":[]}'
+					service = JSON.parse(service)
+					ingress.items.forEach(function(w,j){
+						w.spec.rules.forEach(function(x,k){
+							console.log("COMPARAMOS " + x.http.paths[0].backend.serviceName + " == " + v.metadata.name)
+							if(x.http.paths[0].backend.serviceName == v.metadata.name){
+								/* Es una regla del servicio en cuestion */
+								service.urls.push( {url:x.host,
+													path:x.http.paths[0].path,
+													port:x.http.paths[0].backend.servicePort})
+							}
+						})
+					})
 				}
-				v.spec.ports.forEach(function(w,j){
-					service.ports.push({name:w.name,protocol:w.protocol,port:w.targetPort})
-				})
 				data.services.push(service)
 			})
 		}
