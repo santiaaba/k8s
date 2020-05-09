@@ -91,13 +91,17 @@ app.post("/v1/app/namespace", function(req,res){api_namespace.nuevo(req,res)})
 app.delete("/v1/app/namespace/:namespaceid", function(req,res){api_namespace.drop(req,res)})
 
 /* Pods */
+/*
 app.get("/v1/app/namespace/:namespaceid/pod/:podName", function(req,res){api_pod.show(req,res)})
 app.get("/v1/app/namespace/:namespaceid/pod", function(req,res){api_pod.list(req,res)})
+*/
 
 /* Services */
+/*
 app.get("/v1/app/namespace/:namespaceid/service/:serviceName", function(req,res){api_service.show(req,res)})
 app.get("/v1/app/namespace/:namespaceid/service/:serviceName/pod", function(req,res){api_service.pods(req,res)})
 app.get("/v1/app/namespace/:namespaceid/service", function(req,res){api_service.list(req,res)})
+*/
 
 /* Deployments */
 app.get("/v1/app/namespace/:namespaceid/deployment/:deploymentName", function(req,res){api_deployment.show(req,res)})
@@ -106,10 +110,10 @@ app.get("/v1/app/namespace/:namespaceid/deployment/:deploymentName/pods", functi
 app.get("/v1/app/namespace/:namespaceid/deployment", function(req,res){api_deployment.list(req,res)})
 app.post("/v1/app/namespace/:namespaceid/deployment", function(req,res){api_deployment.apply(req,res)})
 
-/* PVC */
-app.get("/v1/app/:userid/namespace/:namespaceid/pvc/:pvcName", function(req,res){api_pvc.show(req,res)})
-app.get("/v1/app/:userid/namespace/:namespaceid/pvc", function(req,res){api_pvc.list(req,res)})
-app.post("/v1/app/:userid/namespace/:namespaceid/pvc", function(req,res){api_pvc.create(req,res)})
+/* Volumenes */
+app.get("/v1/app/namespace/:namespaceid/volume/:pvcName", function(req,res){api_pvc.show(req,res)})
+app.get("/v1/app/namespace/:namespaceid/volume", function(req,res){api_pvc.list(req,res)})
+app.post("/v1/app/namespace/:namespaceid/volume", function(req,res){api_pvc.create(req,res)})
 
 app.listen(port,function(){
 	console.log("Nose server running on http://10.120.78.86:" + port)

@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: _name_      # "Ingress_" + fibercorpID
+  labels:
+    fibercorpIngress: _fibercorpID_     # Lo podemos obtener #
+  annotations:
+     kubernetes.io/ingress.class: traefik
+spec:
+  rules:
+_hostRule_
+
+#   - host: panaderia.k8s.fibercorp.com.ar   # viene en el body #
+#     http:
+#       paths:
+#       - path: /        # viene en el body #
+#         backend:
+#           serviceName: wordpress   # Lo podemos obtener #
+#           servicePort: http        # Lo podemos obtener #

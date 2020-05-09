@@ -165,46 +165,29 @@ apply: function(req,res){
 			/* volumneDef */
 			if(typeof(req.body.volumes) != 'undefined'){
 				data = 'volumes:\n'
-				//claimTemplates = 'volumeClaimTemplates:\n'
 				for(i=0;i<req.body.volumes.length;i++){
 				    if(typeof(req.body.volumes[i].name) == 'undefined' ||
 				       typeof(req.body.volumes[i].type) == 'undefined')
 							reject("ACA5")
-					data += '         - name: ' + req.body.volumes[i].name + '\n'
+					data = data + '         - name: ' + req.body.volumes[i].name + '\n'
 					switch(req.body.volumes[i].type){
 						case "emptydir":
-							data += '           ' + req.body.volumes[i].type + ': {}\n'
+							data = data + '           ' + req.body.volumes[i].type + ': {}\n'
 							break
 						case "pvc":
-							/* Para un pvc ya existente */
-							if(typeof req.body.volumes[i].pvc == 'undefined')
+							if(typeof req.body.volumes[i].size == 'undefined')
 								reject("Falta especificar el volumen")
-							data += '           persistentVolumeClaim:\n'
-							data += '             claimName: ' +
-								   req.body.volumes[i].pvc + '\n'
+							data = data + '           persistentVolumeClaim:\n'
+							data = data + '             claimName: ' +
+								   req.body.volunes[i].pvc + '\n'
 							break
 						case "secret":
 							if(typeof req.body.volumes[i].secret == 'undefined')
 								reject("Falta especificar en secret")
-							data += '           secret:\n'
-							data += '             secretName: ' +
-								   req.body.volumes[i].secret + '\n'
+							data = data + '           secret:\n'
+							data = data + '             secretName: ' +
+								   req.body.volunes[i].secret + '\n'
 							break
-						/*
-						case "local":
-							if(typeof req.body.volumes[i].size == 'undefined')
-								reject("Falta especificar local")
-							claimTemplates += '   - metadata:\n'
-							claimTemplates += '      name: ' +
-								   req.body.volumes[i].name + '\n'
-							claimTemplates += '      spec:\n' 
-							claimTemplates += '      	storageClassName: csi-rbd-sc\n'
-							claimTemplates += '         resources:\n' 
-							claimTemplates += '            requests:\n'
-							claimTemplates += '               storage:' +
-								   req.body.volumes[i].size + '\n'
-							break
-						*/
 						default:
 							reject("Tipo volumen " + req.body.volumes[i].type + " no permitido")
 					}
@@ -213,9 +196,6 @@ apply: function(req,res){
 			} else {
 				data = ''
 			}
-			/* if(claimTemplates == 'volumeClaimTemplates:\n')
-				claimTemplates ==''
-			diccionario.push({'regex':'_claimTemplates_','value':claimTemplates}) */
 			diccionario.push({'regex':'_volume_defs_','value':data})
 
 			resolv(name)
@@ -604,10 +584,7 @@ show: function(req,res){
 						if(typeof(volumes[i].persistentVolumeClaim) != 'undefined'){
 							/* Es un PVC */
 							data.volumes.push({
-								name:v.name,
-								path:v.mountPath,
-								type:'pvc',
-								pvc:volumes[i].persistentVolumeClaim.claimName})
+							name:v.name,path:v.mountPath,type:'pvc'})
 						} else { if(typeof(volumes[i].secret) != 'undefined'){
 							/* Es un secret */
 							data.volumes.push({

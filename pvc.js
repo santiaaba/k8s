@@ -19,13 +19,13 @@ create: function(req,res){
 	.then(name =>{
 		return new Promise((resolv,reject) => {
 			console.log("Generamos el diccionario")
-			if(typeof req.body.deployName == 'undefined' ||
-			   typeof req.body.containerName == 'undefined' ||
-			   typeof req.body.replicas == 'undefined')
+			if(typeof req.body.name == 'undefined' ||
+			   typeof req.body.size == 'undefined' ||
+			   typeof req.body.class == 'undefined')
 					reject("ACA1")
 			diccionario.push({'regex':'_pvc_name_','value':req.body.name})
-			diccionario.push({'regex':'_pvc_size_','value':req.body.class})
-			diccionario.push({'regex':'_pvc_class_','value':req.body.size})
+			diccionario.push({'regex':'_pvc_size_','value':req.body.size})
+			diccionario.push({'regex':'_pvc_class_','value':req.body.class})
 			resolv(name)
 		})
 	})

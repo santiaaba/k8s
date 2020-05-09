@@ -15,32 +15,16 @@ nuevo: function(req,res){
 		res.status(410).send('{"error":"Parametros incorrectos"}')
 		return
 	}
-	/* Existencia usuario */
-	//userInfo(req.params.userid,db)
-	userInfo(userid,db)
-	.then(rows => {
+	var userid = userByToken(token)
+	if(userid){
 		sql = 'insert into namespace(user_id,name) values (' +
 			  userid + ',"' + req.body.name + '")'
 		console.log(sql)
 		return db.query(sql)
-	},err=>{
-		return new Promise((resolve,reject)=>{
-			res.status(410).send('{"error":"Usuario inexistente"}')
-		})
-	})
-
-	sql = 'select id from user where id =' + userid
-	console.log(sql)
-	db.query(sql)
-	.then( rows => {
-		if(rows.length != 1){
-			res.status(410).send('{"error":"Usuario inexistente"}')
-			return
-		}
-		sql = 'insert into namespace(name) values ("' + req.body.name + '")'
-		console.log(sql)
-		return db.query(sql)
-	})
+	} else {
+		res.status(410).send('{"error":"Usuario inexistente"}')
+	}
+	REEEEEVIIIISAAAAAAAR!!!!!
 	/* Creamos Namespace en K8S */
 	.then( rows => {
 		insertId = rows.insertId
@@ -48,12 +32,10 @@ nuevo: function(req,res){
 		var diccionario = new Array
 		diccionario.push({'regex':'_namespace_name_','value':req.body.name})
 		/* Creamos el namespace */
-		//var k8s_api = new K8sApi('10.120.78.86','6443')
 		return k8s_api.call('/api/v1/namespaces','POST','alta_namespace.yaml',diccionario)
 	}, err => {
 		errorDB()
 	})
-
 	.then( ok => {
 		console.log("Namespace dado de ALTAAA!!")
 		var url = '/apis/networking.k8s.io/v1/namespaces/' + req.body.name + '/networkpolicies'
@@ -208,9 +190,12 @@ drop: function(req,res){
 	})
 },
 
-//checkUserNamespace: function(idUser,idNamespace){
 checkUserNamespace: function(req){
-	/* Verifica que usuario y namespace existan */
+	/* Verifica que usuario y namespace existan.
+	 * Toma el token del header y por el mismo busca
+	 * en la base de datos al usuario. Luego, verifica
+	 * que el namespace pasado en la url como parametro
+	 * pertenezca al usuario */
 	return new Promise((resolv,reject) => {
 		var idUser = 0
 		var i = 0
@@ -258,11 +243,29 @@ namespaceNameById: function(idNamespace){
 
 } /* Fin del modulo */
 
-function userInfo(id,db){
+function userByToken(token){
+	/* Dato el token, retorna el id del usuario
+	 * retorna 0 si no existe */
+	var idUser = 0
+	var i = 0
+	while(idUser == 0 && i < users.length){
+		if(token == users[i].token){
+			idUser = users[i].id
+		}
+		i++
+	}
+	return idUser
+}
+
+/*
+function userInfo(token,db){
+	/* Dado el token obtenido del header, busca el
+ 	 * usuario en la base de datos y lo retorna 
 	sql = 'select id from user where id =' + id
 	console.log(sql)
 	return db.query(sql)
 }
+*/
 
 function errorDB(err){
 	return new Promise((resolve,reject) => {
