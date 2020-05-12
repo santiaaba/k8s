@@ -6,6 +6,7 @@ var api_pod = require('./pod.js')
 var api_deployment = require('./deployment.js')
 var api_service = require('./service.js')
 var api_pvc = require('./pvc.js')
+var api_secret = require('./secret.js')
 
 var bodyParser = require("body-parser")
 var cors = require('cors')
@@ -89,6 +90,11 @@ app.get("/v1/app/namespace/:namespaceid", function(req,res){api_namespace.show(r
 app.get("/v1/app/namespace", function(req,res){api_namespace.list(req,res)})
 app.post("/v1/app/namespace", function(req,res){api_namespace.nuevo(req,res)})
 app.delete("/v1/app/namespace/:namespaceid", function(req,res){api_namespace.drop(req,res)})
+
+/* Secret */
+app.get("/v1/app/namespace/:namespaceid/secret/:secretName", function(req,res){api_secret.show(req,res)})
+app.get("/v1/app/namespace/:namespaceid/secret", function(req,res){api_secret.list(req,res)})
+app.post("/v1/app/namespace/:namespaceid/secret", function(req,res){api_secret.apply(req,res)})
 
 /* Pods */
 /*

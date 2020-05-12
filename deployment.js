@@ -667,8 +667,11 @@ status: function(req,res){
 },
 
 pods: function(req,res){
+	/* Retorna informacion sobre los pods
+	 * del deployment */
 	var deployment
 	var services
+	var pods
 	var fibercorpID
 	var namespaceName
 	var k8s_api = new K8sApi('10.120.78.86','6443')
@@ -684,8 +687,8 @@ pods: function(req,res){
 		})
 	})
 	.then(ok =>{
-		/* Debemos obtener los datos del deploy y de ellos sacar el
- 		 * fibercorpID */
+		/* Debemos obtener los datos del deploy y de ellos sacar el selector
+		 * a utilizar para buscar sus pods */
 		namespaceName = ok
 		console.log("Enviando consulta a api K8S")
 		console.log("namespaceName:" + namespaceName + " deployment:" + req.params.deploymentName)
@@ -699,19 +702,53 @@ pods: function(req,res){
 		})
 	})
 	.then(ok=>{
-		var fibercorpID = ok.message.metadata.labels.fibercorpDeploy
+		//var fibercorpID = ok.message.metadata.labels.fibercorpDeploy
+		var selector=''
+		var matchLabels = ok.message.spec.selector.matchLabels
+		var labels = Object.keys(matchLabels)
+		labels.forEach(function(v,i){
+			console.log(v + " => " + matchLabels[v])
+			selector += v + '%3D' + matchLabels[v] + ','
+		})
+		selector = selector.slice(0, -1)
+		selector = selector.replace('/','%2F')
+		selector = selector.replace('.','%2E')
+		console.log(selector)
 		/* Buscamos los pods de este deployment */
 		return k8s_api.call('/api/v1/namespaces/' + namespaceName +
-							'/pods?labelSelector=fibercorpPod%3D' +
-							 fibercorpID,'GET','none.yaml',{})
+							'/pods?labelSelector=' + selector,'GET','none.yaml',{})
 	},err=>{
-		res.status(err.code).send(err.message)
+		return new Promise((resolv,reject)=>{
+			res.status(err.code).send(err.message)
+		})
 	})
 	.then(ok=>{
-		res.send(ok.message)
+		/* Buscamos los Eventos de los pods */
+		pods = ok.message
+		return k8s_api.call('/apis/events.k8s.io/v1beta1/namespaces/' + namespaceName +
+                            '/events','GET','none.yaml',{})
+	},err=>{
+		return new Promise((resolv,reject)=>{
+			res.status(err.code).send(err.message)
+		})
+	})
+	.then(events=>{
+		var podList = new Set
+		pods.items.forEach(function(v,i){
+			/* A la estructura pod retornada por K8S
+			 * le agregamos eventos */
+			v.events = new Array
+			/* Cargamos los eventos de este pod */
+			events.message.items.forEach(function(w,j){
+				if(v.metadata.name == w.regarding.name)
+					v.events.push(w)
+			})
+		})
+		res.send(pods)
 	},err=>{
 		res.status(err.code).send(err.message)
 	})
+
 },
 
 drop: function(req,res){

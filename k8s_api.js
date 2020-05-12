@@ -65,7 +65,7 @@ class K8sApi {
 					reject({status:500,message:'{"error":"Error interno"}'})
 				})
 				if(method == 'POST' || method == 'PUT'){
-					//console.log("Enviando: \n" + data)
+					console.log("Enviando: \n" + data)
 					req.write(data)
 				}
 				req.on('end',() => {
@@ -80,10 +80,12 @@ class K8sApi {
 module.exports = K8sApi
 
 function reemplazo(string,d){
-	for(i=0;i<d.length;i++){
-		//console.log("Reemplazando: --" + d[i].regex + '-- por --' + d[i].value + '--')
-		regex = new RegExp(d[i].regex,'g')
-		string = string.replace(regex,d[i].value)
+	if(typeof(d) != 'undefined'){
+		for(i=0;i<d.length;i++){
+			//console.log("Reemplazando: --" + d[i].regex + '-- por --' + d[i].value + '--')
+			regex = new RegExp(d[i].regex,'g')
+			string = string.replace(regex,d[i].value)
+		}
 	}
 	return string
 }

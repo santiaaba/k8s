@@ -7,6 +7,7 @@ nuevo: function(req,res){
 
 	var inserId=0
 	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var promise
 
 	/* Verificaciones previas */
 	/* validez de datos */
@@ -15,18 +16,19 @@ nuevo: function(req,res){
 		res.status(410).send('{"error":"Parametros incorrectos"}')
 		return
 	}
-	var userid = userByToken(token)
+	var userid = userByToken(req.header('token'))
 	if(userid){
 		sql = 'insert into namespace(user_id,name) values (' +
 			  userid + ',"' + req.body.name + '")'
 		console.log(sql)
-		return db.query(sql)
+		promise = db.query(sql)
 	} else {
-		res.status(410).send('{"error":"Usuario inexistente"}')
+		promise = new Promise((resolv,reject)=>{
+			res.status(410).send('{"error":"Usuario inexistente"}')
+		})
 	}
-	REEEEEVIIIISAAAAAAAR!!!!!
 	/* Creamos Namespace en K8S */
-	.then( rows => {
+	promise.then( rows => {
 		insertId = rows.insertId
 		console.log("ID generado =" + insertId)
 		var diccionario = new Array
@@ -41,17 +43,21 @@ nuevo: function(req,res){
 		var url = '/apis/networking.k8s.io/v1/namespaces/' + req.body.name + '/networkpolicies'
 		var diccionario = new Array
 		diccionario.push({'regex':'_namespace_name_','value':req.body.name})
-		return k8s_api.call(url,'POST','alta_networkpolicy.yaml',diccionario)
+		return k8s_api.call(url,'POST','default_networkpolicy.yaml',diccionario)
 	}, err => {
 		console.log("Fallo alta namespace en K8s")
 		sql = 'delete from namespace where id = "' + insertId + '"'
 		console.log(sql)
 		db.query(sql)
 		.then(rows => {
-				res.status(500).send('{"error":"No se pudo crear el namespace en K8S"}')
+				return new Promise((resolv,reject)=>{
+					res.status(500).send('{"error":"No se pudo crear el namespace en K8S"}')
+				})
 		})
 		.catch(err => {
-				res.status(500).send('{"error":"Error fatal. Base de datos no responde"}')
+				return new Promise((resolv,reject)=>{
+					res.status(500).send('{"error":"Error fatal. Base de datos no responde"}')
+				})
 		})
 	})
 	.then( ok => {
@@ -256,16 +262,6 @@ function userByToken(token){
 	}
 	return idUser
 }
-
-/*
-function userInfo(token,db){
-	/* Dado el token obtenido del header, busca el
- 	 * usuario en la base de datos y lo retorna 
-	sql = 'select id from user where id =' + id
-	console.log(sql)
-	return db.query(sql)
-}
-*/
 
 function errorDB(err){
 	return new Promise((resolve,reject) => {

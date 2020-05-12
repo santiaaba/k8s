@@ -165,29 +165,46 @@ apply: function(req,res){
 			/* volumneDef */
 			if(typeof(req.body.volumes) != 'undefined'){
 				data = 'volumes:\n'
+				//claimTemplates = 'volumeClaimTemplates:\n'
 				for(i=0;i<req.body.volumes.length;i++){
 				    if(typeof(req.body.volumes[i].name) == 'undefined' ||
 				       typeof(req.body.volumes[i].type) == 'undefined')
 							reject("ACA5")
-					data = data + '         - name: ' + req.body.volumes[i].name + '\n'
+					data += '         - name: ' + req.body.volumes[i].name + '\n'
 					switch(req.body.volumes[i].type){
 						case "emptydir":
-							data = data + '           ' + req.body.volumes[i].type + ': {}\n'
+							data += '           ' + req.body.volumes[i].type + ': {}\n'
 							break
 						case "pvc":
-							if(typeof req.body.volumes[i].size == 'undefined')
+							/* Para un pvc ya existente */
+							if(typeof req.body.volumes[i].pvc == 'undefined')
 								reject("Falta especificar el volumen")
-							data = data + '           persistentVolumeClaim:\n'
-							data = data + '             claimName: ' +
-								   req.body.volunes[i].pvc + '\n'
+							data += '           persistentVolumeClaim:\n'
+							data += '             claimName: ' +
+								   req.body.volumes[i].pvc + '\n'
 							break
 						case "secret":
 							if(typeof req.body.volumes[i].secret == 'undefined')
 								reject("Falta especificar en secret")
-							data = data + '           secret:\n'
-							data = data + '             secretName: ' +
-								   req.body.volunes[i].secret + '\n'
+							data += '           secret:\n'
+							data += '             secretName: ' +
+								   req.body.volumes[i].secret + '\n'
 							break
+						/*
+						case "local":
+							if(typeof req.body.volumes[i].size == 'undefined')
+								reject("Falta especificar local")
+							claimTemplates += '   - metadata:\n'
+							claimTemplates += '      name: ' +
+								   req.body.volumes[i].name + '\n'
+							claimTemplates += '      spec:\n' 
+							claimTemplates += '      	storageClassName: csi-rbd-sc\n'
+							claimTemplates += '         resources:\n' 
+							claimTemplates += '            requests:\n'
+							claimTemplates += '               storage:' +
+								   req.body.volumes[i].size + '\n'
+							break
+						*/
 						default:
 							reject("Tipo volumen " + req.body.volumes[i].type + " no permitido")
 					}
@@ -196,6 +213,9 @@ apply: function(req,res){
 			} else {
 				data = ''
 			}
+			/* if(claimTemplates == 'volumeClaimTemplates:\n')
+				claimTemplates ==''
+			diccionario.push({'regex':'_claimTemplates_','value':claimTemplates}) */
 			diccionario.push({'regex':'_volume_defs_','value':data})
 
 			resolv(name)
@@ -584,7 +604,10 @@ show: function(req,res){
 						if(typeof(volumes[i].persistentVolumeClaim) != 'undefined'){
 							/* Es un PVC */
 							data.volumes.push({
-							name:v.name,path:v.mountPath,type:'pvc'})
+								name:v.name,
+								path:v.mountPath,
+								type:'pvc',
+								pvc:volumes[i].persistentVolumeClaim.claimName})
 						} else { if(typeof(volumes[i].secret) != 'undefined'){
 							/* Es un secret */
 							data.volumes.push({
@@ -644,8 +667,11 @@ status: function(req,res){
 },
 
 pods: function(req,res){
+	/* Retorna informacion sobre los pods
+	 * del deployment */
 	var deployment
 	var services
+	var pods
 	var fibercorpID
 	var namespaceName
 	var k8s_api = new K8sApi('10.120.78.86','6443')
@@ -661,8 +687,8 @@ pods: function(req,res){
 		})
 	})
 	.then(ok =>{
-		/* Debemos obtener los datos del deploy y de ellos sacar el
- 		 * fibercorpID */
+		/* Debemos obtener los datos del deploy y de ellos sacar el selector
+		 * a utilizar para buscar sus pods */
 		namespaceName = ok
 		console.log("Enviando consulta a api K8S")
 		console.log("namespaceName:" + namespaceName + " deployment:" + req.params.deploymentName)
@@ -676,19 +702,53 @@ pods: function(req,res){
 		})
 	})
 	.then(ok=>{
-		var fibercorpID = ok.message.metadata.labels.fibercorpDeploy
+		//var fibercorpID = ok.message.metadata.labels.fibercorpDeploy
+		var selector=''
+		var matchLabels = ok.message.spec.selector.matchLabels
+		var labels = Object.keys(matchLabels)
+		labels.forEach(function(v,i){
+			console.log(v + " => " + matchLabels[v])
+			selector += v + '%3D' + matchLabels[v] + ','
+		})
+		selector = selector.slice(0, -1)
+		selector = selector.replace('/','%2F')
+		selector = selector.replace('.','%2E')
+		console.log(selector)
 		/* Buscamos los pods de este deployment */
 		return k8s_api.call('/api/v1/namespaces/' + namespaceName +
-							'/pods?labelSelector=fibercorpPod%3D' +
-							 fibercorpID,'GET','none.yaml',{})
+							'/pods?labelSelector=' + selector,'GET','none.yaml',{})
 	},err=>{
-		res.status(err.code).send(err.message)
+		return new Promise((resolv,reject)=>{
+			res.status(err.code).send(err.message)
+		})
 	})
 	.then(ok=>{
-		res.send(ok.message)
+		/* Buscamos los Eventos de los pods */
+		pods = ok.message
+		return k8s_api.call('/apis/events.k8s.io/v1beta1/namespaces/' + namespaceName +
+                            '/events','GET','none.yaml',{})
+	},err=>{
+		return new Promise((resolv,reject)=>{
+			res.status(err.code).send(err.message)
+		})
+	})
+	.then(events=>{
+		var podList = new Set
+		pods.items.forEach(function(v,i){
+			/* A la estructura pod retornada por K8S
+			 * le agregamos eventos */
+			v.events = new Array
+			/* Cargamos los eventos de este pod */
+			events.message.items.forEach(function(w,j){
+				if(v.metadata.name == w.regarding.name)
+					v.events.push(w)
+			})
+		})
+		res.send(pods)
 	},err=>{
 		res.status(err.code).send(err.message)
 	})
+
 },
 
 drop: function(req,res){
