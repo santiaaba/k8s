@@ -121,8 +121,11 @@ list: function(req,res){
 },
 
 show: function(req,res){
-	/* Retorna la información de un namespace en particular */
-
+	/* Retorna la información de un namespace en particular. Obtenemos
+	   de la API de k8s el namespace y le agregamos algunos datos de
+	   sumarizacion */
+	var datos
+	var namespace_name
 	var k8s_api = new K8sApi('10.120.78.86','6443')
 
 	module.exports.checkUserNamespace(req)
@@ -135,6 +138,7 @@ show: function(req,res){
 		})
 	})
 	.then(name =>{
+		namespace_name = name
 		console.log("Consultando API de K8s")
 		return k8s_api.call('/api/v1/namespaces/' + name,'GET','none.yaml',{})
 	}, err => {
@@ -143,8 +147,30 @@ show: function(req,res){
 			res.status(err.code).send(err.body)
 		})
 	})
+
 	.then( ok => {
-		res.status(ok.status).send(ok.message)
+		datos = ok.message
+		datos.summary = {}
+		/* Consultamos ahora por los deployment existentes */
+		return k8s_api.call('/apis/apps/v1/namespaces/' + namespace_name +
+							'/deployments','GET','none.yaml',{})
+	})
+	.then( ok => {
+		datos.summary.deployments = ok.message.items.length
+		/* Consultamos ahora por los servicios existentes */
+		return k8s_api.call('/api/v1/namespaces/' + namespace_name +
+							'/services','GET','none.yaml',{})
+		res.status(ok.status).send(datos)
+	})
+	.then( ok => {
+		datos.summary.services = ok.message.items.length
+		/* Consultamos ahora por los volumenes */
+		return k8s_api.call('/api/v1/namespaces/' + namespace_name +
+							'/persistentvolumeclaims','GET','none.yaml',{})
+	})
+	.then( ok => {
+		datos.summary.pvcs = ok.message.items.length
+		res.status(ok.status).send(datos)
 	})
 	.catch( err => {
 		console.log(err)
@@ -225,7 +251,7 @@ checkUserNamespace: function(req){
 			}
 		}, err => {
 			console.log(err)
-			reject({code:500,message:"Error en base de datos"})
+			reject({code:500,message:"Id de Namespace ingresado incorrecto"})
 		})
 	})
 },

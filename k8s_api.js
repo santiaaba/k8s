@@ -65,7 +65,7 @@ class K8sApi {
 					reject({status:500,message:'{"error":"Error interno"}'})
 				})
 				if(method == 'POST' || method == 'PUT'){
-					console.log("Enviando: \n" + data)
+					//console.log("Enviando: \n" + data)
 					req.write(data)
 				}
 				req.on('end',() => {

@@ -14,15 +14,5 @@ spec:
          labels:
             fibercorpPod: _fibercorpID_
       spec:
-         containers:
-         - name: _container_name_
-           image: _image_name_
-           resources:
-              requests:
-                 cpu: _cpu_request_
-                 memory: _mem_request_
-           _envs_
-           _args_
-           _ports_
-           _volume_mounts_
+         _containers_
          _volume_defs_

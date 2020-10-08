@@ -5,12 +5,13 @@ metadata:
    labels:
       fibercorpService: _fibercorpID_
       type: _labeltype_
+      deploy: _deployName_
 spec:
    type: _type_     #NodePort|ClusterIP
    selector:
-      fibercorpPod: _fibercorpID_
-   _ports_
-#  ports:
+_selectors_
+   ports:
+_ports_
 #    - port: _port_
 #      protocol: _protocol_   #TCP|UDP
 #      targetPort: _port_

@@ -67,7 +67,8 @@ list: function(req,res){
 	})
 	.then(name =>{
 		console.log("Enviando consulta a api K8S")
-		return k8s_api.call('/api/v1/namespaces/' + name + '/persistentvolumeclaims','GET','none.yaml',{})
+		return k8s_api.call('/api/v1/namespaces/' + name +
+							'/persistentvolumeclaims','GET','none.yaml',{})
 	}, err => {
 		console.log(err)
 		return new Promise((resolv,reject) => {
@@ -116,7 +117,37 @@ show: function(req,res){
 
 },
 
-drop: function(req,res){
+delete: function(req,res){
+
+	var k8s_api = new K8sApi('10.120.78.86','6443')
+
+	NamespaceApi.checkUserNamespace(req)
+	.then(ok =>{
+		console.log("Buscando nombre")
+		return NamespaceApi.namespaceNameById(req.params.namespaceid)
+	}, err => {
+		console.log("Error usernamespace")
+		return new Promise((resolv,reject) => {
+			res.status(err.code).send(err.message)
+		})
+	})
+	.then(namespaceName =>{
+		console.log("Enviando consulta a api K8S")
+		return k8s_api.call('/api/v1/namespaces/' + namespaceName +
+							'/persistentvolumeclaims/' + req.params.pvcName,'DELETE','none.yaml',{})
+	}, err => {
+		console.log(err)
+		return new Promise((resolv,reject) => {
+			res.status(err.code).send(err.message)
+		})
+	})
+	.then(ok => {
+		res.status(ok.status).send(ok.message)
+	},err => {
+		console.log(err)
+		res.status(err.status).send(err.message)
+	})
+
 },
 
 }

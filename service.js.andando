@@ -9,35 +9,6 @@ apply: function(req,res){
 	/* Aplica un servicio. No hay basicamente diferencia entre alta y modificacion.
 	 * Si el servicio ya existia entonces se borra y se crea nuevamente */
 
-	function altaIngress(req,fibercorpID,serviceName){
-		var diccionario = []
-		var ingress = ''
-		console.log("Agregando Ingress")
-		diccionario.push({'regex':'_fibercorpID_','value':fibercorpID})
-		diccionario.push({'regex':'_serviceName_','value':serviceName})
-		if(typeof(req.body.urls) != 'undefined'){
-			req.body.urls.forEach(function(v,i){
-				ingress += '    - host: ' + v.url + '\n'
-				ingress += '      http:\n'
-				ingress += '        paths:\n'
-				ingress += '         - path: ' + v.path + '\n'
-				ingress += '           backend:\n'
-				ingress += '             serviceName: ' + serviceName + '\n'
-				ingress += '             servicePort: ' + v.port + '\n'
-			})
-		}
-		diccionario.push({'regex':'_hostRule_','value':ingress})
-		if(ingress != ''){
-			const url = '/apis/extensions/v1beta1/namespaces/' +
-						namespaceName + '/ingresses'
-			return k8s_api.call(url,'POST','alta_ingress.yaml',diccionario)
-		} else {
-				/* No cargo ningun ingress */
-			return new Promise((resolv,reject)=>{ resolv() })
-		}
-
-	}
-
 	var diccionario = new Array
 	var serviceName
 	var namespaceName
@@ -163,10 +134,16 @@ apply: function(req,res){
 		}
 		diccionario.push({regex:'_ports_',value:ports_string})
 
-		/* Eliminamos el service actual si existiese*/
-		console.log("Borramos el servicio actual ya que es una modificacion")
-		return k8s_api.call('/api/v1/namespaces/' + namespaceName +
-			  '/services/' + serviceName,'DELETE','none.yaml',{})
+		if(!alta){
+			/* Eliminamos el service actual */
+			console.log("Borramos el servicio actual ya que es una modificacion")
+			return k8s_api.call('/api/v1/namespaces/' + namespaceName +
+				  '/services/' + serviceName,'DELETE','none.yaml',{})
+		} else {
+			console.log("No hacemos nada. Pasamos a dar de alta el servicio")
+			/* No hacemos nada */
+			return new Promise((resolv,reject) => { resolv()})
+		}
 	},err => {
 		return new Promise((resolv,reject)=>{
 			console.log(err)
@@ -175,16 +152,10 @@ apply: function(req,res){
 	})
 	.then(ok=>{
 		/* Damos de alta el servicio */
-		console.log("Existia pero ya no. Damos de alta el servicio")
+		console.log("Damos de alta el servicio")
 		const url = '/api/v1/namespaces/' + namespaceName + '/services'
 		return k8s_api.call(url,'POST','alta_service.yaml',diccionario)
 	},err=>{
-		/* El borrado del servicio retorna codigo 404 si no existe */
-		if(err.status == 404){
-			console.log("Servicio no existia. Damos de alta el servicio")
-			const url = '/api/v1/namespaces/' + namespaceName + '/services'
-			return k8s_api.call(url,'POST','alta_service.yaml',diccionario)
-		}
 		console.log(err)
 		return new Promise((resolv,reject)=>{
 			res.status(err.status).send(err.message)
@@ -192,12 +163,18 @@ apply: function(req,res){
 	})
 	.then(ok=>{
 		/* Borramos el posibles Ingress existentes para este deploy. El
- 		 * nombre del Ingress es "Ingress_" + nombre servicio*/
-		console.log("Borramos posibles Ingress")
-		return k8s_api.call('/apis/networking.k8s.io/v1beta1/namespaces/' +
-							   namespaceName + '/ingresses/' +
-								"ingress-" + serviceName
-							   ,'DELETE','none.yaml',{})
+ 		 * nombre del Ingress es "Ingress_" + FibercorpID*/
+		if(!alta){
+			/* Es modificacion. Borramos Ingress anterior */
+			console.log("Eliminamos " + JSON.stringify(v))
+			return services.push(k8s_api.call('/apis/networking.k8s.io/v1beta1/namespaces/' +
+									   namespaceName + '/ingresses/' +
+										"Ingress" + fibercorpID
+									   ,'DELETE','none.yaml',{}))
+		} else {
+			/* No hago nada. Ya que al ser un alta no hay nada que borrar */
+			return new Promise((resolv,reject) => { resolv()})
+		}
 	},err=>{
 		console.log(err)
 		return new Promise((resolv,reject)=>{
@@ -207,12 +184,33 @@ apply: function(req,res){
 	.then(ok =>{
 	/* Sea un alta o modificacion, agregamos los Ingress. Solo
 	 * de aquellos servicios que sean del tipo url.  */
-		return altaIngress(req,fibercorpID,serviceName)
-	},err=>{
-		console.log("Fallo alta Deploy en K8s o Ingress no existia")
-		if(err.status == 404){
-			return altaIngress(req,fibercorpID,serviceName)
+		console.log("Agregando Ingress")
+		diccionario = []
+		diccionario.push({'regex':'_fibercorpID_','value':fibercorpID})
+		diccionario.push({'regex':'_serviceName_','value':serviceName})
+		var ingress = ''
+		if(typeof(req.body.urls) != 'undefined'){
+			req.body.urls.forEach(function(v,i){
+				ingress += '    - host: ' + v.url + '\n'
+				ingress += '      http:\n'
+				ingress += '        paths:\n'
+				ingress += '         - path: ' + v.path + '\n'
+				ingress += '           backend:\n'
+				ingress += '             serviceName: ' + serviceName + '\n'
+				ingress += '             servicePort: ' + v.port + '\n'
+			})
 		}
+		diccionario.push({'regex':'_hostRule_','value':ingress})
+		if(ingress != ''){
+			const url = '/apis/extensions/v1beta1/namespaces/' +
+						namespaceName + '/ingresses'
+			return k8s_api.call(url,'POST','alta_ingress.yaml',diccionario)
+		} else {
+				/* No cargo ningun ingress */
+			return new Promise((resolv,reject)=>{ resolv() })
+		}
+	},err=>{
+		console.log("Fallo alta Deploy en K8s")
 		console.log(err)
 		return new Promise((resolv,reject)=>{
 			res.status(err.status).send(err.message)
@@ -222,7 +220,7 @@ apply: function(req,res){
 		console.log("servicio dado de alta!!")
 		console.log("Implementar alta en equipo que realiza NAT/PAT")
 		return new Promise((resolv,reject)=>{
-			res.send("Servicio generado")
+			res.status(200).send("Servicio generado")
 		})
 	},err=>{
 		/* Fallo el alta del Ingress. Debemos borrar el servicio */

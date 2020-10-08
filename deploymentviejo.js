@@ -4,6 +4,10 @@ const helper = require("./helper.js")
 
 module.exports = {
 
+apply_chech_data: function(req,res){
+	/* evisa que los datos sean correctos */
+	return true
+},
 
 apply: function(req,res){
 /* Se utiliza tanto para un alta como una modificacion.
@@ -46,178 +50,153 @@ apply: function(req,res){
 
 			//console.log("Generamos el diccionario")
 			if(typeof req.body.deployName == 'undefined' ||
-			   typeof req.body.containerName == 'undefined' ||
-			   typeof req.body.resources.cpu == 'undefined' ||
-			   typeof req.body.resources.mem == 'undefined' ||
-			   typeof req.body.image == 'undefined' ||
-			   typeof req.body.replicas == 'undefined')
-					reject("Revisar los valores deployName, containerName, " +
-						   "resources.cpu, resources.mem, image y replicas")
+			   typeof req.body.replicas == 'undefined' ||
+			   typeof req.body.containers == 'undefined')
+					reject("Revisar los valores DeployName containers  y replicas")
 			diccionario.push({'regex':'_deploy_name_','value':req.body.deployName})
-			diccionario.push({'regex':'_container_name_','value':req.body.containerName})
-			diccionario.push({'regex':'_cpu_request_','value':req.body.resources.cpu})
-			diccionario.push({'regex':'_mem_request_','value':req.body.resources.mem})
 			diccionario.push({'regex':'_replicas_','value':req.body.replicas})
-			diccionario.push({'regex':'_image_name_','value':req.body.image})
-			/* Args */
-			if(typeof(req.body.args) != 'undefined'){
-				data = "args:\n"
-				for(i=0;i<req.body.args.length;i++){
-					data = data + "           - " + req.body.args[i] + "\n"
+
+			/* Los contenedores */
+			var container = 'containers:\n'
+			req.body.containers.forEach(function(v,i){
+				container += '         - name: ' + v.name + '\n'
+				container += '           image: ' + v.image + '\n'
+				container += '           resources:\n'
+				container += '             limits:\n'
+				container += '               cpu: ' + v.resources.cpu + '\n'
+				container += '               memory: ' + v.resources.mem + '\n'
+				/* Args */
+				if(typeof(v.args) != 'undefined'){
+					container += "           args:\n"
+					v.args.forEach(function(w,j){
+						container += "             - " + w + "\n"
+					})
 				}
-			} else {
-				data = ''
-			}
-			diccionario.push({'regex':'_args_','value':data})
-		
-			/* Env */
-			if(typeof(req.body.envs) != 'undefined'){
-				data = 'env:\n'
-				for(i=0;i<req.body.envs.length;i++){
-				    if(typeof req.body.envs[i].name == 'undefined'||
-				       typeof req.body.envs[i].value == 'undefined')
-							reject("ACA2")
-					data = data + '           - name: ' + req.body.envs[i].name + '\n'
-					data = data + '             value: "' + req.body.envs[i].value + '"\n'
-				}
-			} else {
-				data = ''
-			}
-			diccionario.push({'regex':'_envs_','value':data})
-		
-			/* Servicios */
-			if(typeof(req.body.services) != 'undefined'){
-				for(i=0;i<req.body.services.length;i++){
-				    if(typeof req.body.services[i].name == 'undefined'||
-				       typeof req.body.services[i].type == 'undefined'){
-							reject("ACA3")
-					}
-				    if((req.body.services[i].type == 'out' ||
-				       req.body.services[i].type == 'in') &&
-					   typeof(req.body.services[i].ports) == 'undefined'){
-							reject("Falta definir puertos")
-					}
-					if(req.body.services[i].type == 'out' &&
-					   typeof(req.body.services[i].ip) == 'undefined'){
-							reject("Falta IP")
-					}
-					if(req.body.services[i].type == 'url' &&
-					   typeof(req.body.services[i].urls) == 'undefined'){
-							reject("Falta la URL")
-					}
-					if(req.body.services[i].type != 'url' &&
-					   typeof(req.body.services[i].ports) == 'undefined'){
-							reject("Falta definir puertos")
-					}
-					data = 'ports:\n'
-					if(req.body.services[i].type != 'url'){
-						/* Revisamos los puertos */
-						for(j=0;j<req.body.services[i].ports.length;j++){
-							var port = req.body.services[i].ports[j]
-							if(typeof port.protocol == 'undefined'||
-		                       typeof port.port == 'undefined')
-									reject("Puerto mal cargado")
-							data += '           - containerPort: ' + port.port + '\n'
-							data += '             name: ' + port.name + '\n'
-							data += '             protocol: ' + port.protocol + '\n'
+				/* Env */
+				if(typeof(v.envs) != 'undefined'){
+					container += "           env:\n"
+					v.envs.forEach(function(w,j){
+					    if(typeof w.name == 'undefined'||
+					       typeof w.type == 'undefined')
+								reject("Envs falta nombre y/o tipo")
+						container += '             - name: ' + w.name + '\n'
+						switch(w.type){
+							case 'text':
+								container += '               value: "' + w.value + '"\n'
+								break
+							case 'secret':
+								if(typeof w.secret == 'undefined'||
+			                       typeof w.key == 'undefined')
+										reject("Envs name o key del tipo incorrecto")
+								container += '             valueFrom:\n'
+								container += '                secretKeyRef:\n'
+								container += '                   name: ' + w.secret + '\n'
+								container += '                   key: ' + w.key + '\n'
+								break
+							default:
+								reject("Envs tipo no permitido")
 						}
-					} else {
-						/* Revisamos los URL */
-						ports = new Set
-						for(j=0;j<req.body.services[i].urls.length;j++){
-							var url = req.body.services[i].urls[j]
-							if(typeof url.path == 'undefined'||
-		                       typeof url.port == 'undefined' ||
-		                       typeof url.path == 'undefined')
-									reject("URL mal declarada.")
-							ports.add(url.port)
+					})
+				}
+			
+				/* Servicios */
+				if(typeof(v.services) != 'undefined'){
+					v.services.forEach(function(w,j){
+					    if(typeof w.name == 'undefined'||
+					       typeof w.type == 'undefined'){
+								reject("ACA3")
 						}
-						ports.forEach(function(v,i){
-							data += '           - containerPort: ' + v + '\n'
-							data += '             name: ingress' + v + '\n'
-							data += '             protocol: TCP\n'
-						})
-					}
+					    if((w.type == 'out' || w.type == 'in') && typeof(w.ports) == 'undefined'){
+								reject("Falta definir puertos")
+						}
+						if(w.type == 'out' && typeof(w.ip) == 'undefined'){
+								reject("Falta IP")
+						}
+						if(w.type == 'url' && typeof(w.urls) == 'undefined'){
+								reject("Falta la URL")
+						}
+						if(w.type != 'url' && typeof(w.ports) == 'undefined'){
+								reject("Falta definir puertos")
+						}
+						container += '           ports:\n'
+						if(w.type != 'url'){
+							/* Revisamos los puertos */
+							w.ports.forEach(function(x,k){
+								if(typeof x.protocol == 'undefined'||
+			                       typeof x.port == 'undefined')
+										reject("Puerto mal cargado")
+								container += '             - containerPort: ' + x.port + '\n'
+								container += '               name: ' + x.name + '\n'
+								container += '               port: ' + x.port + '\n'
+							})
+						} else {
+							/* Revisamos los URL */
+							protocols = new Set
+							w.urls.forEach(function(x,k){
+								if(typeof x.path == 'undefined'|| typeof x.protocol == 'undefined')
+										reject("URL mal declarada.")
+								protocols.add(x.protocol)
+							})
+							protocols.forEach(function(v,i){
+								container += '             - containerPort: ' + v + '\n'
+								container += '               name: ingress' + v + '\n'
+								container += '               port: ' + v.protocol + '\n'
+							})
+						}
+					})
+					//console.log('PORTS: ' + data)
 				}
-				data = data.slice(0, -1)
-				//console.log('PORTS: ' + data)
-			} else {
-				data = ''
-			}
-			diccionario.push({'regex':'_ports_','value':data})
+				diccionario.push({'regex':'_replicas_','value':req.body.replicas})
 		
-			/* volumes Mount */
-			if(typeof(req.body.volumes) != 'undefined'){
-				data = 'volumeMounts:\n'
-				for(i=0;i<req.body.volumes.length;i++){
-				    if(typeof req.body.volumes[i].name == 'undefined'||
-				       typeof req.body.volumes[i].path == 'undefined')
-							reject("Volumen mal declarado")
-					data = data + '           - name: ' + req.body.volumes[i].name + '\n'
-					data = data + '             mountPath: ' + req.body.volumes[i].path + '\n'
+				/* volumes Mount */
+				if(typeof(v.mounts) != 'undefined'){
+					container += '      volumeMounts:\n'
+					v.mounts.forEach(function(w,j){
+					    if(typeof w.name == 'undefined'|| typeof w.path == 'undefined')
+								reject("Volumen mal declarado")
+						container += '           - name: ' + w.name + '\n'
+						container += '             mountPath: ' + w.path + '\n'
+					})
 				}
-				data = data.slice(0, -1)
-			} else {
-				data = ''
-			}
-			diccionario.push({'regex':'_volume_mounts_','value':data})
+			})
+			console.log("DATOS del _containers_: " + container)
+			diccionario.push({regex:'_containers_',value:container})
 	
 			/* volumneDef */
 			if(typeof(req.body.volumes) != 'undefined'){
 				data = 'volumes:\n'
 				//claimTemplates = 'volumeClaimTemplates:\n'
-				for(i=0;i<req.body.volumes.length;i++){
-				    if(typeof(req.body.volumes[i].name) == 'undefined' ||
-				       typeof(req.body.volumes[i].type) == 'undefined')
+				req.body.volumes.forEach(function(v,i){
+				    if(typeof(v.name) == 'undefined' || typeof(v.type) == 'undefined')
 							reject("ACA5")
-					data += '         - name: ' + req.body.volumes[i].name + '\n'
-					switch(req.body.volumes[i].type){
+					data += '         - name: ' + v.name + '\n'
+					switch(v.type){
 						case "emptydir":
-							data += '           ' + req.body.volumes[i].type + ': {}\n'
+							data += '           ' + v.type + ': {}\n'
 							break
 						case "pvc":
 							/* Para un pvc ya existente */
-							if(typeof req.body.volumes[i].pvc == 'undefined')
+							if(typeof v.pvc == 'undefined')
 								reject("Falta especificar el volumen")
 							data += '           persistentVolumeClaim:\n'
 							data += '             claimName: ' +
-								   req.body.volumes[i].pvc + '\n'
+								   v.pvc + '\n'
 							break
 						case "secret":
-							if(typeof req.body.volumes[i].secret == 'undefined')
+							if(typeof v.secret == 'undefined')
 								reject("Falta especificar en secret")
 							data += '           secret:\n'
 							data += '             secretName: ' +
-								   req.body.volumes[i].secret + '\n'
+								   v.secret + '\n'
 							break
-						/*
-						case "local":
-							if(typeof req.body.volumes[i].size == 'undefined')
-								reject("Falta especificar local")
-							claimTemplates += '   - metadata:\n'
-							claimTemplates += '      name: ' +
-								   req.body.volumes[i].name + '\n'
-							claimTemplates += '      spec:\n' 
-							claimTemplates += '      	storageClassName: csi-rbd-sc\n'
-							claimTemplates += '         resources:\n' 
-							claimTemplates += '            requests:\n'
-							claimTemplates += '               storage:' +
-								   req.body.volumes[i].size + '\n'
-							break
-						*/
 						default:
-							reject("Tipo volumen " + req.body.volumes[i].type + " no permitido")
+							reject("Tipo volumen " + v.type + " no permitido")
 					}
-				}
-				data = data.slice(0, -1)
+				})
 			} else {
 				data = ''
 			}
-			/* if(claimTemplates == 'volumeClaimTemplates:\n')
-				claimTemplates ==''
-			diccionario.push({'regex':'_claimTemplates_','value':claimTemplates}) */
 			diccionario.push({'regex':'_volume_defs_','value':data})
-
 			resolv(name)
 		})
 	})
@@ -288,49 +267,54 @@ apply: function(req,res){
 	})
 	.then(ok =>{
 		/* Sea un alta o modificacion, agregamos los servicios. */
-		req.body.services.forEach(function(v,i){
-			diccionario = []
-			services = new Array
-			diccionario.push({'regex':'_name_','value':v.name})
-			diccionario.push({'regex':'_fibercorpID_','value':fibercorpID})
-			var type
-			switch(v.type){
-				case "in":
-					type = "ClusterIP"
-					break
-				case "out":
-				case "url":
-					type = "NodePort"
-			}
-			diccionario.push({'regex':'_type_','value':type})
-			diccionario.push({'regex':'_labeltype_','value':v.type})
-			var ports= "ports:\n"
-			if(v.type == "in" || v.type == "out"){
-				v.ports.forEach(function(v,i){
-					ports += '       - name: ' + v.name + '\n'
-					ports += '         port: ' + v.port + '\n'
-					ports += '         protocol: ' + v.protocol + '\n'
-					ports += '         targetPort: ' + v.port + '\n'
-				})
-			} else {
-				/* Tenemos que generar los puertos de htt y https
- 				   si el tipo es url (Ingress) */
-				portSet = new Set
-				v.urls.forEach(function(v,i){
-					portSet.add(v.port)
-				})
-				portSet.forEach(function(v,i){
-					ports += '       - name: ingress' + v + '\n'
-					ports += '         port: ' + v + '\n'
-					ports += '         protocol: TCP' +  '\n'
-					ports += '         targetPort: ' + v + '\n'
-				})
-			}
-			diccionario.push({'regex':'_ports_','value':ports})
-			const url = '/api/v1/namespaces/' + namespaceName + '/services'
-			services.push(k8s_api.call(url,'POST','alta_service.yaml',diccionario))
-		})
-		return Promise.all(services)
+		if(typeof(req.body.services) != 'undefined'){
+			req.body.services.forEach(function(v,i){
+				diccionario = []
+				services = new Array
+				diccionario.push({'regex':'_name_','value':v.name})
+				diccionario.push({'regex':'_fibercorpID_','value':fibercorpID})
+				var type
+				switch(v.type){
+					case "in":
+						type = "ClusterIP"
+						break
+					case "out":
+					case "url":
+						type = "NodePort"
+				}
+				diccionario.push({'regex':'_type_','value':type})
+				diccionario.push({'regex':'_labeltype_','value':v.type})
+				var ports= "ports:\n"
+				if(v.type == "in" || v.type == "out"){
+					v.ports.forEach(function(v,i){
+						ports += '       - name: ' + v.name + '\n'
+						ports += '         port: ' + v.port + '\n'
+						ports += '         protocol: ' + v.protocol + '\n'
+						ports += '         targetPort: ' + v.port + '\n'
+					})
+				} else {
+					/* Tenemos que generar los puertos de htt y https
+ 					   si el tipo es url (Ingress) */
+					portSet = new Set
+					v.urls.forEach(function(v,i){
+						portSet.add(v.port)
+					})
+					portSet.forEach(function(v,i){
+						ports += '       - name: ingress' + v + '\n'
+						ports += '         port: ' + v + '\n'
+						ports += '         protocol: TCP' +  '\n'
+						ports += '         targetPort: ' + v + '\n'
+					})
+				}
+				diccionario.push({'regex':'_ports_','value':ports})
+				const url = '/api/v1/namespaces/' + namespaceName + '/services'
+				services.push(k8s_api.call(url,'POST','alta_service.yaml',diccionario))
+			})
+			return Promise.all(services)
+		} else {
+			console.log("No hay servicios")
+            return new Promise((resolv,reject) => { resolv()})
+		}
 	},err=>{
 		console.log("Fallo alta Deploy en K8s")
 		console.log(err)
@@ -402,28 +386,30 @@ apply: function(req,res){
 		diccionario.push({'regex':'_fibercorpID_','value':fibercorpID})
 		diccionario.push({'regex':'_name_','value':'ingress-' + req.body.deployName})
 		var ingress = ''
-		req.body.services.forEach(function(v,i){
-			if(v.type == 'url'){
-				var serviceName = v.name
-				v.urls.forEach(function(v,i){
-					ingress += '    - host: ' + v.url + '\n'
-					ingress += '      http:\n'
-					ingress += '        paths:\n'
-					ingress += '        - path: ' + v.path + '\n'
-					ingress += '          backend:\n'
-					ingress += '            serviceName: ' + serviceName + '\n'
-					ingress += '            servicePort: ' + v.port + '\n'
-				})
+		if(typeof(req.body.services) != 'undefined'){
+			req.body.services.forEach(function(v,i){
+				if(v.type == 'url'){
+					var serviceName = v.name
+					v.urls.forEach(function(v,i){
+						ingress += '    - host: ' + v.url + '\n'
+						ingress += '      http:\n'
+						ingress += '        paths:\n'
+						ingress += '        - path: ' + v.path + '\n'
+						ingress += '          backend:\n'
+						ingress += '            serviceName: ' + serviceName + '\n'
+						ingress += '            servicePort: ' + v.port + '\n'
+					})
+				}
+			})
+			diccionario.push({'regex':'_hostRule_','value':ingress})
+			if(ingress != ''){
+				const url = '/apis/extensions/v1beta1/namespaces/' +
+							namespaceName + '/ingresses'
+				return k8s_api.call(url,'POST','alta_ingress.yaml',diccionario)
+			} else {
+				/* No cargo ningun ingress */
+				return new Promise((resolv,reject)=>{ resolv() })
 			}
-		})
-		diccionario.push({'regex':'_hostRule_','value':ingress})
-		if(ingress != ''){
-			const url = '/apis/extensions/v1beta1/namespaces/' +
-						namespaceName + '/ingresses'
-			return k8s_api.call(url,'POST','alta_ingress.yaml',diccionario)
-		} else {
-			/* No cargo ningun ingress */
-			return new Promise((resolv,reject)=>{ resolv() })
 		}
 	},err=>{
 		console.log("Fallo alta Deploy en K8s")
@@ -561,7 +547,14 @@ show: function(req,res){
 		}
 		if(typeof(container.env) != 'undefined'){
 			container.env.forEach(function(v,i){
-				data.envs.push({name:v.name,value:v.value})
+				if(typeof(v.valueFrom) != 'undefined'){
+					var env = {name:v.name,type:'secret',
+							   secret:v.valueFrom.secretKeyRef.name,
+							   key:v.valueFrom.secretKeyRef.key}
+				} else {
+					var env = {name:v.name,type:'text',value:v.value}
+				}
+				data.envs.push(env)
 			})
 		}
 		if(typeof(services) != 'undefined'){

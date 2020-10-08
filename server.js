@@ -78,6 +78,7 @@ function permiso(req,res,next){
 
 db = new Database
 users = new Array
+var path = ''
 
 app.use(bodyParser.json())
 app.use(cors())
@@ -86,41 +87,42 @@ app.use(cors())
 app.post("/v1/user/login",function(req,res){userLogin(req,res)})
 
 /* Namespase */
-app.get("/v1/app/namespace/:namespaceid", function(req,res){api_namespace.show(req,res)})
-app.get("/v1/app/namespace", function(req,res){api_namespace.list(req,res)})
-app.post("/v1/app/namespace", function(req,res){api_namespace.nuevo(req,res)})
-app.delete("/v1/app/namespace/:namespaceid", function(req,res){api_namespace.drop(req,res)})
+path = "/v1/app/namespace"
+app.get(path + "/:namespaceid", function(req,res){api_namespace.show(req,res)})
+app.get(path, function(req,res){api_namespace.list(req,res)})
+app.post(path, function(req,res){api_namespace.nuevo(req,res)})
+app.delete(path + "/:namespaceid", function(req,res){api_namespace.drop(req,res)})
 
 /* Secret */
-app.get("/v1/app/namespace/:namespaceid/secret/:secretName", function(req,res){api_secret.show(req,res)})
-app.get("/v1/app/namespace/:namespaceid/secret", function(req,res){api_secret.list(req,res)})
-app.post("/v1/app/namespace/:namespaceid/secret", function(req,res){api_secret.apply(req,res)})
-
-/* Pods */
-/*
-app.get("/v1/app/namespace/:namespaceid/pod/:podName", function(req,res){api_pod.show(req,res)})
-app.get("/v1/app/namespace/:namespaceid/pod", function(req,res){api_pod.list(req,res)})
-*/
+path = "/v1/app/namespace/:namespaceid/secret"
+app.get(path + "/:secretName", function(req,res){api_secret.show(req,res)})
+app.get(path, function(req,res){api_secret.list(req,res)})
+app.post(path, function(req,res){api_secret.apply(req,res)})
 
 /* Services */
-/*
-app.get("/v1/app/namespace/:namespaceid/service/:serviceName", function(req,res){api_service.show(req,res)})
-app.get("/v1/app/namespace/:namespaceid/service/:serviceName/pod", function(req,res){api_service.pods(req,res)})
-app.get("/v1/app/namespace/:namespaceid/service", function(req,res){api_service.list(req,res)})
-*/
+path = '/v1/app/namespace/:namespaceid/service'
+app.get(path, function(req,res){api_service.list(req,res)})
+app.get(path + "/:serviceName", function(req,res){api_service.show(req,res)})
+app.delete(path + "/:serviceName", function(req,res){api_service.delete(req,res)})
+app.post(path, function(req,res){api_service.apply(req,res)})
 
 /* Deployments */
-app.get("/v1/app/namespace/:namespaceid/deployment/:deploymentName", function(req,res){api_deployment.show(req,res)})
-app.get("/v1/app/namespace/:namespaceid/deployment/:deploymentName/status", function(req,res){api_deployment.status(req,res)})
-app.get("/v1/app/namespace/:namespaceid/deployment/:deploymentName/pods", function(req,res){api_deployment.pods(req,res)})
-app.get("/v1/app/namespace/:namespaceid/deployment", function(req,res){api_deployment.list(req,res)})
-app.post("/v1/app/namespace/:namespaceid/deployment", function(req,res){api_deployment.apply(req,res)})
+path = "/v1/app/namespace/:namespaceid/deployment"
+app.get(path + "/:deploymentName", function(req,res){api_deployment.show(req,res)})
+app.get(path + "/:deploymentName/status", function(req,res){api_deployment.status(req,res)})
+app.get(path + "/:deploymentName/pods", function(req,res){api_deployment.pods(req,res)})
+app.get(path, function(req,res){api_deployment.list(req,res)})
+app.post(path, function(req,res){api_deployment.apply(req,res)})
+app.delete(path + "/:deploymentName", function(req,res){api_deployment.delete(req,res)})
 
 /* Volumenes */
-app.get("/v1/app/namespace/:namespaceid/volume/:pvcName", function(req,res){api_pvc.show(req,res)})
-app.get("/v1/app/namespace/:namespaceid/volume", function(req,res){api_pvc.list(req,res)})
-app.post("/v1/app/namespace/:namespaceid/volume", function(req,res){api_pvc.create(req,res)})
+path = "/v1/app/namespace/:namespaceid/volume"
+app.get(path + "/:pvcName", function(req,res){api_pvc.show(req,res)})
+app.get(path, function(req,res){api_pvc.list(req,res)})
+app.post(path, function(req,res){api_pvc.create(req,res)})
+app.delete(path + "/:pvcName", function(req,res){api_pvc.delete(req,res)})
 
+/***********************************/
 app.listen(port,function(){
 	console.log("Nose server running on http://10.120.78.86:" + port)
 	console.log('CORS-enabled')

@@ -1,7 +1,7 @@
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: _name_      # "Ingress_" + fibercorpID
+  name: ingress-_serviceName_
   labels:
     fibercorpIngress: _fibercorpID_     # Lo podemos obtener #
   annotations:

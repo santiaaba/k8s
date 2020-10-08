@@ -9,5 +9,16 @@ module.exports = {
 			result += characters.charAt(Math.floor(Math.random() * charactersLength));
 		}
 		return result;
+	},
+
+	enviarError: function(res,err){
+		console.log(err)
+		return new Promise((resolv,reject) => {
+       	    res.status(err.status).send(err.message)
+		})
+	},
+
+	compare: function(k1,k2){
+		return JSON.stringify(k1) === JSON.stringify(k2)
 	}
 }
