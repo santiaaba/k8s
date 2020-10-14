@@ -225,6 +225,7 @@ list: function(req,res){
 		})
 	})
 	.then(ok => {
+		ok.message.idNamespace = req.params.namespaceid
 		res.status(ok.status).send(ok.message)
 	},err => {
 		console.log(err)
