@@ -9,12 +9,12 @@
   "author": "Santiago Diaz",
   "license": "ISC",
   "dependencies": {
-     "express":"*",
-     "mysql":"*",
-     "nodemailer":"*",
-     "https":"*",
-     "request": "*",
-     "body-parser":"*",
-     "cors":"*"
+    "body-parser": "*",
+    "cors": "*",
+    "express": "*",
+    "https": "*",
+    "mysql": "*",
+    "nodemailer": "*",
+    "request": "*"
   }
 }

@@ -1,8 +1,9 @@
 /* Modulo para la conexion a la base de datos */
 const mysql = require('mysql')
+//const mysql = require('@mysql/xdevapi')
 
 const db_host = "localhost"
-const db_user = "root"
+const db_user = "k8s"
 const db_pass = "sAn474226"
 const db_db = "k8s"
 

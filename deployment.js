@@ -1,5 +1,6 @@
 const K8sApi = require("./k8s_api.js")
 const NamespaceApi = require("./namespace.js")
+const metricsApi = require("./prometheus.js")
 const helper = require("./helper.js")
 
 module.exports = {
@@ -385,71 +386,22 @@ status: function(req,res){
 
 pods: function(req,res){
 	/* Retorna informacion sobre los pods
-	 * del deployment */
-	var deployment
-	var services
-	var pods
-	var fibercorpID
-	var namespaceName
+	 * del deployment y su namespaceName */
 	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var pods
 
-	NamespaceApi.checkUserNamespace(req)
-	.then(ok =>{
-		console.log("Buscando nombre")
-		return NamespaceApi.namespaceNameById(req.params.namespaceid)
-	}, err => {
-		console.log("Error usernamespace")
-		return new Promise((resolv,reject) => {
-			res.status(err.code).send(err.message)
-		})
-	})
-	.then(ok =>{
-		/* Debemos obtener los datos del deploy y de ellos sacar el selector
-		 * a utilizar para buscar sus pods */
-		namespaceName = ok
-		console.log("Enviando consulta a api K8S")
-		console.log("namespaceName:" + namespaceName + " deployment:" + req.params.deploymentName)
-		return k8s_api.call('/apis/apps/v1/namespaces/' + namespaceName +
-							'/deployments/' + req.params.deploymentName
-							,'GET','none.yaml',{})
-	}, err => {
-		console.log(err)
-		return new Promise((resolv,reject) => {
-			res.status(err.code).send(err.message)
-		})
-	})
-	.then(ok=>{
-		//var fibercorpID = ok.message.metadata.labels.fibercorpDeploy
-		var selector=''
-		var matchLabels = ok.message.spec.selector.matchLabels
-		var labels = Object.keys(matchLabels)
-		labels.forEach(function(v,i){
-			console.log(v + " => " + matchLabels[v])
-			selector += v + '%3D' + matchLabels[v] + ','
-		})
-		selector = selector.slice(0, -1)
-		selector = selector.replace('/','%2F')
-		selector = selector.replace('.','%2E')
-		console.log(selector)
-		/* Buscamos los pods de este deployment */
-		return k8s_api.call('/api/v1/namespaces/' + namespaceName +
-							'/pods?labelSelector=' + selector,'GET','none.yaml',{})
-	},err=>{
-		return new Promise((resolv,reject)=>{
-			res.status(err.code).send(err.message)
-		})
-	})
+	find_pods(req,res)
 	.then(ok=>{
 		/* Buscamos los Eventos de los pods */
+		console.log("Buscamos los eventos")
 		pods = ok.message
-		return k8s_api.call('/apis/events.k8s.io/v1beta1/namespaces/' + namespaceName +
+		console.log("Buscamos los eventos 2")
+		console.log(namespaceName)
+		return k8s_api.call('/apis/events.k8s.io/v1beta1/namespaces/' + ok.message.namespaceName +
                             '/events','GET','none.yaml',{})
-	},err=>{
-		return new Promise((resolv,reject)=>{
-			res.status(err.code).send(err.message)
-		})
 	})
 	.then(events=>{
+		console.log("Obtuvimos los eventos")
 		var podList = new Set
 		pods.items.forEach(function(v,i){
 			/* A la estructura pod retornada por K8S
@@ -462,8 +414,13 @@ pods: function(req,res){
 			})
 		})
 		res.send(pods)
-	},err=>{
-		res.status(err.code).send(err.message)
+	})
+	.catch(err=>{
+		console.log(err)
+		if(typeof(err.code)!='undefined' && typeof(err.message) !='undefined' )
+			res.status(err.code).send(err.message)
+		else
+			res.status(500).send('Error fatal')
 	})
 
 },
@@ -496,6 +453,89 @@ delete: function(req,res){
 	},err=>{
 		res.status(err.code).send(err.message)
 	})
+},
+
+metrics_cpu: function(req,res){
+	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var metrics_api = new metricsApi('10.120.78.86','30000')
+
+	find_pods(req,res)
+	.then(pods =>{
+		var podNames = ''
+		console.log(pods)
+		pods.message.items.forEach(function(v){
+			podNames += v.metadata.name + '|'
+		})
+		podNames = podNames.slice(0, -1)
+		console.log(podNames)
+		query = 'sum(rate(container_cpu_user_seconds_total{namespace="' + pods.message.namespaceName +
+				'",container="POD",pod=~"' + podNames + '"}[' + req.query.step + ']))'
+        return metrics_api.call(query,req.query.start,req.query.end,60)
+	})
+	.then(data => {
+		res.send(data)
+	})
+	.catch(err =>{
+		console.log(err)
+		if(typeof(err.code)!='undefined' && typeof(err.message) !='undefined' )
+			res.status(err.code).send(err.message)
+		else
+			res.status(500).send('Error fatal')
+	})
 }
 
+}
+
+function find_pods(req,res){
+	/* Retorna una promesa que obtiene los pods
+	   de un deployment */
+
+	return new Promise((resolv,reject)=>{
+		var deployment
+		var services
+		var pods
+		var fibercorpID
+		//var namespaceName
+		var k8s_api = new K8sApi('10.120.78.86','6443')
+	
+		NamespaceApi.checkUserNamespace(req)
+		.then(ok =>{
+			console.log("Buscando nombre")
+			return NamespaceApi.namespaceNameById(req.params.namespaceid)
+		})
+		.then(ok =>{
+			/* Debemos obtener los datos del deploy y de ellos sacar el selector
+			 * a utilizar para buscar sus pods */
+			namespaceName = ok
+			console.log("Enviando consulta a api K8S")
+			console.log("namespaceName:" + namespaceName + " deployment:" + req.params.deploymentName)
+			return k8s_api.call('/apis/apps/v1/namespaces/' + namespaceName +
+								'/deployments/' + req.params.deploymentName
+								,'GET','none.yaml',{})
+		})
+		.then(ok=>{
+			//var fibercorpID = ok.message.metadata.labels.fibercorpDeploy
+			var selector=''
+			var matchLabels = ok.message.spec.selector.matchLabels
+			var labels = Object.keys(matchLabels)
+			labels.forEach(function(v,i){
+				console.log(v + " => " + matchLabels[v])
+				selector += v + '%3D' + matchLabels[v] + ','
+			})
+			selector = selector.slice(0, -1)
+			selector = selector.replace('/','%2F')
+			selector = selector.replace('.','%2E')
+			console.log(selector)
+			/* Buscamos los pods de este deployment */
+			return k8s_api.call('/api/v1/namespaces/' + namespaceName +
+								'/pods?labelSelector=' + selector,'GET','none.yaml',{})
+		})
+		.then(pods=>{
+			pods.message.namespaceName = namespaceName
+			resolv(pods)
+		})
+		.catch(err => {
+			reject(err)
+		})
+	})
 }

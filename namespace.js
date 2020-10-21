@@ -1,4 +1,5 @@
 const K8sApi = require("./k8s_api.js")
+const metricsApi = require("./prometheus.js")
 const valid_name = /^[a-z][a-z0-9]+$/
 
 module.exports = {
@@ -46,18 +47,16 @@ nuevo: function(req,res){
 		return k8s_api.call(url,'POST','default_networkpolicy.yaml',diccionario)
 	}, err => {
 		console.log("Fallo alta namespace en K8s")
-		sql = 'delete from namespace where id = "' + insertId + '"'
+		sql = 'delete from namespace where id = ' + insertId 
 		console.log(sql)
 		db.query(sql)
 		.then(rows => {
-				return new Promise((resolv,reject)=>{
-					res.status(500).send('{"error":"No se pudo crear el namespace en K8S"}')
-				})
+			console.log("Namespace eliminado")
+		},err => {
+			console.log("DB ERROR al querer eliminar el namespace")
 		})
-		.catch(err => {
-				return new Promise((resolv,reject)=>{
-					res.status(500).send('{"error":"Error fatal. Base de datos no responde"}')
-				})
+		return new Promise((resolv,reject)=>{
+			res.status(500).send('{"error":"No se pudo crear el namespace en K8S"}')
 		})
 	})
 	.then( ok => {
@@ -72,13 +71,13 @@ nuevo: function(req,res){
 			console.log(sql)
 			db.query(sql)
 		}, err =>{
-				res.status(500).send('{"error":"Error Fatal"}')
+			res.status(500).send('{"error":"Error Fatal"}')
 		})
 		.then(rows => {
-				res.status(401).send('{"error":"No se pudo crear el namespace en K8S"}')
+			res.status(401).send('{"error":"No se pudo crear el namespace en K8S"}')
 		})
 		.catch(err => {
-				res.status(500).send('{"error":"Error Fatal"}')
+			res.status(500).send('{"error":"Error Fatal"}')
 		})
 	})
 },
@@ -242,6 +241,7 @@ checkUserNamespace: function(req){
 		}
 		sql = 'select name from namespace where id =' + req.params.namespaceid
 			  ' and user_id = ' + idUser
+		console.log(sql)
 		db.query(sql)
 		.then(rows => {
 			if(rows.length == 1){
@@ -270,6 +270,138 @@ namespaceNameById: function(idNamespace){
 		}, err =>{
 			reject({code:500,message:"Error en abse de datos"})
 		})
+	})
+},
+
+metrics_mem_all: function(req,res){
+	/* Retorna las metricas de uso de ram entre todos los namespaces*/
+
+	var metrics_api = new metricsApi('10.120.78.86','30000')
+	console.log("Metrics all")
+
+	var a = new Promise((resolv,reject) => {
+		var idUser = 0
+		var i = 0
+		console.log("-------usuarios-------")
+		console.log(users)
+		console.log("----------------------")
+		while(idUser == 0 && i < users.length){
+			if(req.headers['token'] == users[i].token){
+				idUser = users[i].id
+			}
+			i++
+		}
+		if (!idUser)
+			reject({code:300,message:"Token Incorrecto"})
+		resolv(idUser)
+	})
+	a.then(userID => {
+		sql = 'select id,name from namespace where user_id =' + userID
+		console.log(sql)
+		return db.query(sql)
+	})
+	.then(data=>{
+		console.log(data)
+		var namespaces=''
+		data.forEach(function(v){
+			namespaces += v.name + '|'
+		})
+		console.log(namespaces)
+		if(namespaces.length > 1)
+			namespaces = namespaces.slice(0, -1)
+		console.log("Consultando API de metrics para: '" + namespaces +"'")
+		var query = 'container_memory_usage_bytes{namespace=~"' + namespaces + '"}'
+		return metrics_api.call(query,req.query.start,req.query.end,60)
+	})
+	.then(data => {
+		console.log(data)
+		res.send(data)
+	})
+	.catch(err => {
+		console.log(err)
+		res.status(410).send('Error')
+	})
+},
+
+metrics_cpu_all: function(req,res){
+	/* Retorna las metricas de uso de cpu entre todos los namespaces*/
+
+	var metrics_api = new metricsApi('10.120.78.86','30000')
+	console.log("Metrics all")
+
+	var a = new Promise((resolv,reject) => {
+		var idUser = 0
+		var i = 0
+		console.log("-------usuarios-------")
+		console.log(users)
+		console.log("----------------------")
+		while(idUser == 0 && i < users.length){
+			if(req.headers['token'] == users[i].token){
+				idUser = users[i].id
+			}
+			i++
+		}
+		if (!idUser)
+			reject({code:300,message:"Token Incorrecto"})
+		resolv(idUser)
+	})
+	a.then(userID => {
+		sql = 'select id,name from namespace where user_id =' + userID
+		console.log(sql)
+		return db.query(sql)
+	})
+	.then(data=>{
+		console.log(data)
+		var namespaces=''
+		data.forEach(function(v){
+			namespaces += v.name + '|'
+		})
+		console.log(namespaces)
+		if(namespaces.length > 1)
+			namespaces = namespaces.slice(0, -1)
+		console.log("Consultando API de metrics para: '" + namespaces +"'")
+		var query = 'sum(rate(container_cpu_user_seconds_total{namespace=~"' + namespaces + '"}[' + req.query.step + ']))'
+		return metrics_api.call(query,req.query.start,req.query.end,60)
+	})
+	.then(data => {
+		console.log(data)
+		res.send(data)
+	})
+	.catch(err => {
+		console.log(err)
+		res.status(410).send('Error')
+	})
+},
+
+metrics_cpu: function(req,res){
+	/* Retorna metricas de uso de cpu de un namespace */
+
+	var metrics_api = new metricsApi('10.120.78.86','30000')
+
+	module.exports.checkUserNamespace(req)
+	.then(ok =>{
+		return module.exports.namespaceNameById(req.params.namespaceid)
+	}, err => {
+		console.log(err)
+		return new Promise((resolv,reject) => {
+			res.status(err.code).send(err.message)
+		})
+	})
+	.then(name =>{
+		console.log("Consultando API de metrics")
+		var query = 'sum(rate(container_cpu_user_seconds_total{namespace="' + name + '"}[5m]))'
+		return metrics_api.call(query,req.query.start,req.query.end,60)
+	}, err => {
+		console.log(err)
+		return new Promise((resolv,reject) => {
+			res.status(err.code).send(err.body)
+		})
+	})
+	.then(data => {
+		res.send(data)
+	})
+	.catch(err => {
+		res.status(410).send('Error')
 	})
 }
 
@@ -303,3 +435,4 @@ function errorDB(err){
 		}
 	})
 }
+

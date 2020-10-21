@@ -88,7 +88,10 @@ app.post("/v1/user/login",function(req,res){userLogin(req,res)})
 
 /* Namespase */
 path = "/v1/app/namespace"
+app.get(path + "/metrics/cpu", function(req,res){api_namespace.metrics_cpu_all(req,res)})
+app.get(path + "/metrics/mem", function(req,res){api_namespace.metrics_mem_all(req,res)})
 app.get(path + "/:namespaceid", function(req,res){api_namespace.show(req,res)})
+app.get(path + "/:namespaceid/metrics/cpu", function(req,res){api_namespace.metrics_cpu(req,res)})
 app.get(path, function(req,res){api_namespace.list(req,res)})
 app.post(path, function(req,res){api_namespace.nuevo(req,res)})
 app.delete(path + "/:namespaceid", function(req,res){api_namespace.drop(req,res)})
@@ -110,6 +113,7 @@ app.post(path, function(req,res){api_service.apply(req,res)})
 path = "/v1/app/namespace/:namespaceid/deployment"
 app.get(path + "/:deploymentName", function(req,res){api_deployment.show(req,res)})
 app.get(path + "/:deploymentName/status", function(req,res){api_deployment.status(req,res)})
+app.get(path + "/:deploymentName/metrics/cpu", function(req,res){api_deployment.metrics_cpu(req,res)})
 app.get(path + "/:deploymentName/pods", function(req,res){api_deployment.pods(req,res)})
 app.get(path, function(req,res){api_deployment.list(req,res)})
 app.post(path, function(req,res){api_deployment.apply(req,res)})
