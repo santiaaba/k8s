@@ -6,21 +6,18 @@ const helper = require("./helper.js")
 module.exports = {
 
 apply_chech_data: function(req,res){
-	/* evisa que los datos sean correctos */
+	/* revisa que los datos sean correctos */
 	return true
 },
 
 apply: function(req,res){
-/* Se utiliza tanto para un alta como una modificacion.
- * La diferencia recide en que si se especifica o no el fibercorpID.
- * Si se lo especifica es una modificacion. Sino es un alta.
- */
+	/* Crea o modifica un deploy */
 
 	var diccionario = new Array
 	var fibercorpID
 	var namespaceName
 	var errorPrevio
-	const k8s_api = new K8sApi('10.120.78.86','6443')
+	const k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 
 	if(req.method == 'POST')
 		var alta = true
@@ -42,16 +39,8 @@ apply: function(req,res){
 		/* Corroboramos los datos obtenidos por Body */
 		return new Promise((resolv,reject) => {
 			/* Generamos el fibercorpID. Hay pocas probabilidades de
- 			 * que se repita. Pero habria que mejorarlo. Si en el json
-			 * del body viene el fibercorpID es porque es una modificacion.
-			 * Si no viene l fibercorpID es porque es un alta. */
-			if(typeof req.body.fibercorpID != 'undefined'){
-				fibercorpID = req.body.fibercorpID
-				alta = false
-			} else {
-				fibercorpID = helper.makeid(32)
-			}
-			diccionario.push({'regex':'_fibercorpID_','value':fibercorpID})
+ 			 * que se repita. Pero habria que mejorarlo. */
+			diccionario.push({'regex':'_fibercorpID_','value':helper.makeid(32)})
 
 			//console.log("Generamos el diccionario")
 			if(typeof req.body.deployName == 'undefined' ||
@@ -71,11 +60,6 @@ apply: function(req,res){
 			/* Los limites los fijamos a mano momentaneamente */
 				container += '               cpu: 1\n'
 				container += '               memory: 100Mi\n'
-/*
-				container += '               cpu: ' + v.resources.cpu + '\n'
-				container += '               memory: ' + v.resources.mem + '\n'
-
-*/
 				/* Args */
 				if(typeof(v.args) != 'undefined'){
 					container += "           args:\n"
@@ -204,7 +188,7 @@ apply: function(req,res){
 list: function(req,res){
 	/* Lista los deploy de un namespace */
 
-	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 
 	NamespaceApi.checkUserNamespace(req)
 	.then(ok =>{
@@ -243,7 +227,7 @@ show: function(req,res){
 	var ingresses
 	var fibercorpID
 	var namespaceName
-	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 
 	NamespaceApi.checkUserNamespace(req)
 	.then(ok =>{
@@ -354,7 +338,7 @@ status: function(req,res){
 	var services
 	var fibercorpID
 	var namespaceName
-	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 
 	NamespaceApi.checkUserNamespace(req)
 	.then(ok =>{
@@ -387,7 +371,7 @@ status: function(req,res){
 pods: function(req,res){
 	/* Retorna informacion sobre los pods
 	 * del deployment y su namespaceName */
-	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 	var pods
 
 	find_pods(req,res)
@@ -426,7 +410,7 @@ pods: function(req,res){
 },
 
 delete: function(req,res){
-	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 
 	NamespaceApi.checkUserNamespace(req)
 	.then(ok =>{
@@ -456,7 +440,7 @@ delete: function(req,res){
 },
 
 metrics_cpu: function(req,res){
-	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 	var metrics_api = new metricsApi('10.120.78.86','30000')
 
 	find_pods(req,res)
@@ -496,7 +480,7 @@ function find_pods(req,res){
 		var pods
 		var fibercorpID
 		//var namespaceName
-		var k8s_api = new K8sApi('10.120.78.86','6443')
+		var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 	
 		NamespaceApi.checkUserNamespace(req)
 		.then(ok =>{

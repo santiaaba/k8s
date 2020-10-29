@@ -29,14 +29,17 @@ nuevo: function(req,res){
 		})
 	}
 	/* Creamos Namespace en K8S */
-	promise
-	.then( rows => {
+	promise.then( rows => {
 		insertId = rows.insertId
 		console.log("ID generado =" + insertId)
 		var diccionario = new Array
 		diccionario.push({'regex':'_namespace_name_','value':req.body.name})
 		/* Creamos el namespace */
 		return k8s_api.call('/api/v1/namespaces','POST','alta_namespace.yaml',diccionario)
+	}, err => {
+		return new Promise((resolv,reject)=>{
+			errorDB(err)
+		})
 	})
 	.then( ok => {
 		console.log("Namespace dado de ALTAAA!!")
@@ -44,44 +47,40 @@ nuevo: function(req,res){
 		var diccionario = new Array
 		diccionario.push({'regex':'_namespace_name_','value':req.body.name})
 		return k8s_api.call(url,'POST','default_networkpolicy.yaml',diccionario)
+	}, err => {
+		console.log("Fallo alta namespace en K8s. Lo borramos de la base")
+		sql = 'delete from namespace where id = ' + insertId 
+		console.log(sql)
+		db.query(sql)
+		.then(rows => {
+			console.log("Namespace eliminado")
+		},err => {
+			console.log("DB ERROR al querer eliminar el namespace")
+		})
+		return new Promise((resolv,reject)=>{
+			res.status(500).send('{"error":"No se pudo crear el namespace en K8S"}')
+		})
 	})
 	.then( ok => {
 		console.log("NetworkPolicy dada de alta!!")
 		res.send("Namespace dado de alta")
-	})
-	.catch(err => {
-		console.log(err)
-		/* FALLA alta namespace en base de datos */
-		if(typeof(err.code) != 'undefined'){
-			errorDB(err,res)
-		} else {
-			/* Fallo algo en el alta en K8s */
-			console.log("Fallo alta namespace o NetworkPolicy en K8s")
-			sql = 'delete from namespace where id = ' + insertId 
+	}, err => {
+		console.log("Fallo alta NetworkPolicy en K8s")
+		//var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
+		k8s_api.call('/api/v1/namespaces/' + req.body.name,'DELETE','none.yaml',{})
+		.then(ok=>{
+			sql = 'delete from namespace where id = "' + insertId + '"'
 			console.log(sql)
 			db.query(sql)
-			.then(rows => {
-				console.log("Namespace eliminado")
-			},err => {
-				console.log("DB ERROR al querer eliminar el namespace")
-			})
-			/* Si lo que fallo es el alta del NetworkPolicy... entonces debemos
-			   eliminar el namespace en k8s */
-			if(0){  // No esta definido porque no entendemos el posible dato dentro de err
-				console.log("Fallo alta NetworkPolicy en K8s")
-				//var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
-				k8s_api.call('/api/v1/namespaces/' + req.body.name,'DELETE','none.yaml',{})
-				.then(ok=>{
-					sql = 'delete from namespace where id = "' + insertId + '"'
-					console.log(sql)
-					db.query(sql)
-				})
-				.catch(err=>{
-					console.log(err)
-				})
-			}
-			res.status(500).send('{"error":"No se pudo crear el namespace en K8S"}')
-		}
+		}, err =>{
+			res.status(500).send('{"error":"Error Fatal"}')
+		})
+		.then(rows => {
+			res.status(401).send('{"error":"No se pudo crear el namespace en K8S"}')
+		})
+		.catch(err => {
+			res.status(500).send('{"error":"Error Fatal"}')
+		})
 	})
 },
 
@@ -118,7 +117,7 @@ list: function(req,res){
 	})
 	.catch( err => {
 		console.log(err)
-		errorDB(err,res)
+		errorDB(err)
 	})
 },
 
@@ -424,7 +423,7 @@ function userByToken(token){
 	return idUser
 }
 
-function errorDB(err,res){
+function errorDB(err){
 	console.log(err)
 	switch(err.code){
 		case 'ER_DUP_ENTRY':

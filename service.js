@@ -44,7 +44,7 @@ apply: function(req,res){
 	var deploy
 	var labels = []
 	var alta = true
-	const k8s_api = new K8sApi('10.120.78.86','6443')
+	const k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 
 	NamespaceApi.checkUserNamespace(req)
 	.then(ok =>{
@@ -102,12 +102,14 @@ apply: function(req,res){
 		/* Ya obtenidos los datos del deployment buscamos sus puertos y labels */
 		deploy = ok.message
 		console.log("Obtenemos los labels y puertos")
-		var ports = []
 		labels = ok.message.metadata.labels
+		var ports = []
 		ok.message.spec.template.spec.containers.forEach(function(v,i){
-			v.ports.forEach(function(w,j){
-				ports.push(w)
-			})
+			if(typeof(v.ports) != 'undefined'){
+				v.ports.forEach(function(w,j){
+					ports.push(w)
+				})
+			}
 		})
 
 		/* Generamos el selector del service en base a los labels obtenidos */
@@ -245,7 +247,7 @@ apply: function(req,res){
 list: function(req,res){
 	/* Retorna los servicios de un namespace */
 
-	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 
 	NamespaceApi.checkUserNamespace(req)
 	.then(ok =>{
@@ -277,7 +279,7 @@ list: function(req,res){
 show: function(req,res){
 	/* Retorna los servicios de un namespace */
 
-	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 	var k8sService
 	var servicio
 	var namespaceName
@@ -366,7 +368,7 @@ show: function(req,res){
 },
 
 delete: function(req,res){
-	var k8s_api = new K8sApi('10.120.78.86','6443')
+	var k8s_api = new K8sApi(config.k8s_api_url,config.k8s_api_port)
 	var servicio
 	var namespaceName
 

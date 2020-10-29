@@ -10,6 +10,7 @@ var api_secret = require('./secret.js')
 
 var bodyParser = require("body-parser")
 var cors = require('cors')
+var config = require('./config.js')
 
 var app = express()
 const port = 3000
@@ -117,6 +118,7 @@ app.get(path + "/:deploymentName/metrics/cpu", function(req,res){api_deployment.
 app.get(path + "/:deploymentName/pods", function(req,res){api_deployment.pods(req,res)})
 app.get(path, function(req,res){api_deployment.list(req,res)})
 app.post(path, function(req,res){api_deployment.apply(req,res)})
+app.put(path, function(req,res){api_deployment.apply(req,res)})
 app.delete(path + "/:deploymentName", function(req,res){api_deployment.delete(req,res)})
 
 /* Volumenes */
@@ -128,7 +130,7 @@ app.delete(path + "/:pvcName", function(req,res){api_pvc.delete(req,res)})
 
 /***********************************/
 app.listen(port,function(){
-	console.log("Nose server running on http://10.120.78.86:" + port)
+	console.log("Nose server running on http://10.40.12.100:" + port)
 	console.log('CORS-enabled')
 })
 

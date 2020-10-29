@@ -1,5 +1,3 @@
-const token = 'Bearer 9283riwuegfhbv98iq3tukgfbvakess92ioq3tugedavmaw1842903ORQIUWHDFAJ2983RUEWF298YTWFEKUAEGAKJFADSFJKIAUWEKFHKSEDFKSADFHKSAFD'
-
 class K8sApi {
 	constructor(host,port){
 		this.host = host
@@ -34,7 +32,7 @@ class K8sApi {
 					headers: {
 						'Content-Type': 'application/yaml',
 						'Content-Length': data.length,
-						'Authorization': token
+						'Authorization': config.k8s_token
 					}
 				}
 				//console.log(options)
